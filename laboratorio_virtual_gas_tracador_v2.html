@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratório Virtual — Ensaio com Gás Traçador</title>
+<style>
+:root{--line:#345a6b;--cyan:#64d9f2;--ok:#67d49b;--warn:#ffd36b;--bad:#ff8a7a;--txt:#edf9fc;--muted:#adc5cf}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#06131b,#102b39);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--txt)}
+button,input,textarea{font:inherit}
+header{min-height:66px;background:#081b26;border-bottom:1px solid #294a5a;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px}
+.brand b{font-size:18px}.brand small{display:block;color:#91adba;margin-top:3px}
+.badge{font-size:11px;border:1px solid #456b7c;border-radius:999px;padding:7px 10px;color:#b4ecf7;white-space:nowrap}
+.modes{display:flex;gap:8px;padding:11px 18px;background:#0a1d28;border-bottom:1px solid #294a5a;flex-wrap:wrap}
+.mode{border:1px solid #3b6071;background:#102d3b;color:#fff;border-radius:8px;padding:9px 15px;font-weight:900;cursor:pointer}
+.mode.on{background:#1684aa;border-color:#69dff5}.mode.lock{opacity:.4;cursor:not-allowed}
+main{display:grid;grid-template-columns:minmax(700px,1fr) 380px;gap:12px;padding:12px}
+
+/* ---------- Laboratório ---------- */
+.lab{position:relative;display:grid;grid-template-rows:auto 1fr;min-height:720px;border:1px solid var(--line);border-radius:17px;overflow:hidden;background:#dce7e9;box-shadow:0 18px 40px #0006}
+.instr{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px;padding:10px;background:#0c2532;border-bottom:1px solid #2c5061}
+.panel{background:#123343;border:1px solid #4a7383;border-radius:11px;padding:9px;min-width:0}
+.panel>b{display:block;font-size:10px;letter-spacing:.06em;color:#9deaf8;margin-bottom:6px}
+.plan svg{width:100%;height:auto;max-height:150px;display:block;margin:0 auto}
+.plan .posG{cursor:pointer}
+.plan .posG:hover .ring{stroke:#0a6f93;stroke-width:3}
+.lcd{background:#b9d8bd;color:#183528;border:4px solid #233d46;border-radius:6px;padding:6px 8px;font-family:Consolas,"Courier New",monospace;display:flex;justify-content:space-between;align-items:baseline}
+.lcd strong{font-size:26px}.lcd span{font-size:10px;font-weight:700}
+.lcd.off{background:#6f8573;color:#44564a}
+.dstatus{font-size:10px;color:#abc3cc;margin:6px 0;min-height:14px}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ctrl{width:100%;border:0;border-radius:7px;padding:8px 6px;background:#d8e4e8;color:#16313d;font-weight:900;cursor:pointer;font-size:11px}
+.ctrl.on{background:#6ed49d}.ctrl.gasOn{background:#7fdcf2}
+.ctrl:disabled{opacity:.45;cursor:not-allowed}
+.controls .ctrl{margin-bottom:6px}
+.cstatus{font-size:10px;color:#abc3cc;line-height:1.4}
+.stage{position:relative;min-height:440px}
+.stage svg,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage canvas{pointer-events:none}
+#sashG{transition:transform .6s ease}
+.probePulse{animation:pp 1s infinite}@keyframes pp{50%{opacity:.2}}
+.note{position:absolute;left:10px;bottom:10px;background:#08222fe6;border:1px solid #3f6a7c;border-radius:9px;padding:7px 9px;font-size:10px;color:#cfe3ea;max-width:300px;line-height:1.4}
+.toast{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#08222f;border:1px solid #64d9f2;padding:9px 13px;border-radius:8px;z-index:40;opacity:0;transition:.2s;font-size:12px;pointer-events:none;max-width:80%;text-align:center}
+.toast.show{opacity:1}
+
+/* ---------- Painel lateral ---------- */
+.side{background:#0b202b;border:1px solid #345666;border-radius:16px;padding:14px;overflow:auto;max-height:calc(100vh - 150px)}
+.side h2{margin:0 0 5px;font-size:17px}.side>p{font-size:12px;color:#adc4ce;line-height:1.5;margin:0 0 6px}
+.card{background:#102d3a;border:1px solid #345a6c;border-radius:10px;padding:10px;margin:9px 0}
+.card>b{font-size:11px;letter-spacing:.03em}
+.card .txt{font-size:11px;line-height:1.45;color:#b9ced6;margin-top:4px}
+.guide small{color:#75dff4;font-weight:900;font-size:10px;letter-spacing:.08em}
+.guide h3{margin:4px 0 6px;font-size:16px}
+.guide p{font-size:12px;line-height:1.5;color:#c9dbe2;margin:0 0 8px}
+.guide .actions{display:flex;gap:6px;flex-wrap:wrap}
+.guide button{border:0;border-radius:7px;padding:8px 10px;font-weight:900;cursor:pointer;font-size:12px}
+.guide .go{background:#168ab2;color:#fff}.guide .warnBtn{background:#f3cf73;color:#16313d}
+.guide button:disabled{opacity:.4;cursor:not-allowed}
+.metric{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.m{background:#0a222e;border-radius:7px;padding:7px;font-size:10px;color:#9fb8c3}
+.m strong{display:block;font-size:17px;color:#9beafa}
+.graph{height:130px;background:#081d27;border:1px solid #315465;border-radius:8px;margin-top:6px}
+.graph svg{width:100%;height:100%;display:block}
+.graph text{fill:#89aab8;font-size:8px}
+.rtab{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+.rtab th,.rtab td{padding:5px 3px;border-bottom:1px solid #294551;text-align:center}
+.rtab th{color:#9fb8c3;font-weight:700}
+.rtab td.hi{color:var(--warn);font-weight:900}
+.primary{width:100%;border:0;border-radius:8px;padding:10px;background:#1689b0;color:#fff;font-weight:900;cursor:pointer;margin-top:6px}
+.primary.green{background:#2d9f70}
+.primary:disabled{opacity:.35;cursor:not-allowed}
+.log{max-height:140px;overflow:auto;font-size:10px;color:#a9c1cb}.log div{padding:5px 0;border-bottom:1px solid #294551}
+
+/* ---------- Relatório ---------- */
+.modal{display:none;position:fixed;inset:0;z-index:100;background:#020a10cc;overflow:auto;padding:24px}
+.modal.open{display:block}
+.sheet{max-width:900px;margin:0 auto;background:#f7fafb;color:#18303f;border-radius:14px;padding:24px;box-shadow:0 20px 70px #0008}
+.sheet h2{margin:0}.sheet h3{margin:18px 0 8px}
+.rhead{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #26485b;padding-bottom:10px}
+.rbadge{align-self:start;padding:6px 10px;border-radius:999px;background:#e3edf1;font-weight:800;font-size:12px;white-space:nowrap}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.rbox{border:1px solid #c5d2d8;border-radius:10px;padding:10px;background:#fff;font-size:13px;line-height:1.55}
+.rtable{width:100%;border-collapse:collapse;font-size:13px}
+.rtable th,.rtable td{border:1px solid #bdcbd1;padding:7px;text-align:center}
+.rtable th{background:#e6eef1}
+.rtable tr.hi td{background:#fff4d9;font-weight:800}
+.verdict{padding:10px;border-radius:8px;margin:10px 0;font-size:13px;line-height:1.5;border:1px solid}
+.verdict.ok{background:#e5f6ec;border-color:#86c9a3}.verdict.bad{background:#fde9e6;border-color:#e2a197}
+.gab{padding:10px;border-radius:8px;background:#fff4d9;border:1px solid #d9ad4e;margin:10px 0;font-size:13px;line-height:1.5}
+.sheet label{display:block;font-weight:800;margin:12px 0 5px;font-size:13px}
+.sheet textarea,.sheet input{width:100%;border:1px solid #aabcc5;border-radius:8px;padding:9px;background:#fff;color:#18303f}
+.sheet textarea{min-height:80px;resize:vertical}
+.crit{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.crit input{width:110px}
+.ractions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.ractions button{border:0;border-radius:8px;padding:10px 13px;font-weight:800;cursor:pointer}
+.rprimary{background:#176c91;color:#fff}.rsecondary{background:#dce6ea;color:#18303f}
+
+@media(max-width:1150px){main{grid-template-columns:1fr}.side{max-height:none}}
+@media(max-width:760px){main{padding:8px}.instr{grid-template-columns:1fr}header{flex-wrap:wrap}.lab{min-height:0}.stage{min-height:300px}.rgrid{grid-template-columns:1fr}}
+@media print{
+ @page{size:A4;margin:12mm}
+ body{background:#fff}
+ header,.modes,main{display:none!important}
+ .modal{display:block!important;position:static;background:#fff;padding:0}
+ .sheet{box-shadow:none;padding:0;max-width:none}
+ .ractions{display:none}
+ .rbox,.verdict,.gab,tr{break-inside:avoid}
+}
+</style></head>
+<body>
+<header>
+ <div class="brand"><b>Laboratório Virtual — Ensaio com Gás Traçador</b><small>Avaliação quantitativa da contenção de capela de exaustão • simulação didática</small></div>
+ <div class="badge">ABNT NBR 17154:2026 • Seção 9</div>
+</header>
+<div class="modes">
+ <button class="mode on" data-mode="learn">APRENDER</button>
+ <button class="mode lock" data-mode="practice" title="Conclua o APRENDER primeiro">PRATICAR 🔒</button>
+ <button class="mode lock" data-mode="eval" title="Conclua o PRATICAR primeiro">AVALIAÇÃO 🔒</button>
+</div>
+<main>
+<section class="lab" id="lab">
+ <div class="instr">
+  <div class="panel plan">
+   <b>PLANTA • POSIÇÃO DO CONJUNTO</b>
+   <svg viewBox="0 0 300 150" id="planSvg" aria-label="Vista superior da capela com as três posições de ensaio">
+    <rect x="30" y="10" width="240" height="70" rx="4" fill="#dfe8ea" stroke="#6d8087" stroke-width="2"/>
+    <rect x="30" y="10" width="240" height="10" fill="#b8c6c9"/>
+    <text x="150" y="18" text-anchor="middle" font-size="7" font-weight="800" fill="#4d626a">DEFLETOR / FUNDO</text>
+    <line x1="30" y1="80" x2="270" y2="80" stroke="#1d9cc4" stroke-width="3"/>
+    <text x="276" y="83" font-size="7" font-weight="800" fill="#9deaf8">FACE</text>
+    <g id="planPos"></g>
+   </svg>
+  </div>
+  <div class="panel">
+   <b>DETECTOR DE GÁS • SIMULADO</b>
+   <div class="lcd off" id="lcd"><strong id="ppm">----</strong><span>ppm</span></div>
+   <div class="dstatus" id="detStatus">Desligado</div>
+   <div class="btnrow"><button class="ctrl" id="detBtn">POWER</button><button class="ctrl" id="bgBtn">MEDIR FUNDO</button></div>
+  </div>
+  <div class="panel controls">
+   <b>CAPELA E GÁS TRAÇADOR</b>
+   <button class="ctrl" id="exhBtn">EXAUSTÃO • OFF</button>
+   <button class="ctrl" id="sashBtn">JANELA • FECHADA</button>
+   <button class="ctrl" id="gasBtn">GÁS SF₆ • FECHADO</button>
+   <div class="cstatus">Vazão do ejetor: 4,0 L/min</div>
+  </div>
+ </div>
+
+ <div class="stage" id="stage">
+  <!-- Vista lateral (corte). Desenho, gás e sonda usam o mesmo sistema 760 × 440 -->
+  <svg id="sideSvg" viewBox="0 0 760 440" preserveAspectRatio="xMidYMid meet" aria-label="Vista lateral: manequim diante da capela, ejetor de gás no interior">
+   <defs>
+    <linearGradient id="gBody" x1="0" x2="1"><stop offset="0" stop-color="#c3ccce"/><stop offset=".5" stop-color="#eef2f2"/><stop offset="1" stop-color="#aab7b9"/></linearGradient>
+    <linearGradient id="gCoat" x1="0" x2="1"><stop offset="0" stop-color="#c9d7dc"/><stop offset=".5" stop-color="#f2f7f8"/><stop offset="1" stop-color="#b4c5cb"/></linearGradient>
+    <clipPath id="sashClip"><rect x="400" y="120" width="30" height="140"/></clipPath>
+   </defs>
+   <rect x="0" y="0" width="760" height="400" fill="#dce7e9"/>
+   <rect x="0" y="400" width="760" height="40" fill="#aab8ba"/>
+   <line x1="0" y1="400" x2="760" y2="400" stroke="#839496" stroke-width="2"/>
+   <!-- capela -->
+   <rect x="585" y="0" width="38" height="44" fill="#8fa2a9" stroke="#455a63" stroke-width="2"/>
+   <text x="630" y="22" font-size="10" font-weight="800" fill="#4d626a">DUTO</text>
+   <rect x="400" y="40" width="232" height="82" fill="url(#gBody)" stroke="#52656b" stroke-width="2"/>
+   <rect x="416" y="120" width="214" height="136" fill="#d6dfe1"/>
+   <rect x="624" y="40" width="8" height="222" fill="#9aabb0" stroke="#52656b"/>
+   <rect x="598" y="120" width="26" height="136" fill="#c5d0d3"/>
+   <!-- defletor com folgas: superior, central e inferior -->
+   <rect x="592" y="138" width="6" height="40" fill="#6c7f85"/>
+   <rect x="592" y="188" width="6" height="56" fill="#6c7f85"/>
+   <text x="560" y="134" font-size="9" font-weight="800" fill="#4d626a">DEFLETOR</text>
+   <!-- bancada, aerofólio e armário -->
+   <rect x="412" y="255" width="216" height="8" fill="#6d8188"/>
+   <ellipse cx="410" cy="262" rx="14" ry="4.5" fill="#b9c5c8" stroke="#687c83"/>
+   <rect x="405" y="266" width="225" height="134" fill="url(#gBody)" stroke="#6d8087"/>
+   <line x1="517" y1="272" x2="517" y2="394" stroke="#6d8087"/>
+   <!-- ejetor (difusor) -->
+   <g id="ejector">
+    <rect x="440" y="238" width="30" height="17" rx="3" fill="#5d737c" stroke="#314b55"/>
+    <rect x="469" y="235" width="9" height="20" rx="2" fill="#9db1b6" stroke="#405a63"/>
+    <line x1="455" y1="255" x2="455" y2="262" stroke="#314b55" stroke-width="2"/>
+    <text x="440" y="231" font-size="8" font-weight="800" fill="#4d626a">EJETOR</text>
+   </g>
+   <!-- janela -->
+   <g clip-path="url(#sashClip)"><g id="sashG">
+    <rect x="410" y="-60" width="7" height="240" fill="#9fd3e3" fill-opacity=".7" stroke="#6d8a94"/>
+    <rect x="407" y="174" width="13" height="7" rx="2" fill="#526b74"/>
+   </g></g>
+   <text x="424" y="112" font-size="9" font-weight="800" fill="#4d626a">JANELA</text>
+   <!-- manequim, de perfil, voltado para a capela -->
+   <g id="mannequin">
+    <rect x="344" y="290" width="20" height="110" rx="4" fill="#405563"/>
+    <rect x="370" y="290" width="20" height="110" rx="4" fill="#4a6070"/>
+    <path d="M346 170 Q372 158 396 170 L400 292 L342 292 Z" fill="url(#gCoat)" stroke="#8aa0a8"/>
+    <rect x="378" y="176" width="12" height="92" rx="6" fill="#dfe8ea" stroke="#8aa0a8"/>
+    <rect x="366" y="150" width="16" height="16" fill="#cdb29b"/>
+    <ellipse cx="374" cy="134" rx="22" ry="25" fill="#d5b399" stroke="#735f55"/>
+    <path d="M394 132 L401 140 L394 142 Z" fill="#c59d83"/>
+    <text x="330" y="100" font-size="9" font-weight="800" fill="#4d626a">MANEQUIM</text>
+   </g>
+   <!-- sonda na zona respiratória + mangueira até o detector -->
+   <path d="M396 150 C 380 160, 330 175, 320 230 S 300 330, 250 400" fill="none" stroke="#2f4c58" stroke-width="2"/>
+   <rect x="390" y="146" width="14" height="6" rx="2" fill="#253c47"/>
+   <circle id="probeTip" cx="404" cy="149" r="4" fill="#60daf4"/>
+   <text x="422" y="146" font-size="8" font-weight="800" fill="#1b6f8a" id="probeLbl">← SONDA</text>
+   <text x="236" y="395" font-size="8" font-weight="700" fill="#4d626a">→ detector</text>
+  </svg>
+  <canvas id="gasCanvas"></canvas>
+  <div class="note">O SF₆ é incolor. A nuvem azul é apenas uma representação didática do caminho do gás.</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+ </div>
+</section>
+
+<aside class="side">
+ <h2 id="stitle">APRENDER • Ensaio demonstrado</h2>
+ <p id="stext">Acompanhe a preparação, o posicionamento e a leitura do gás traçador. Depois você executará o procedimento.</p>
+
+ <div class="card guide" id="guide">
+  <small id="gcount"></small><h3 id="gtitle"></h3><p id="gtext"></p>
+  <div class="actions"><button class="warnBtn" id="leakBtn" style="display:none">Ver exemplo de vazamento</button><button class="go" id="gnext">Próxima etapa</button></div>
+ </div>
+
+ <div class="card"><b>Leitura na zona respiratória</b>
+  <div class="metric"><div class="m">Atual<strong id="cur">—</strong>ppm</div><div class="m">Média<strong id="avg">—</strong>ppm</div><div class="m">Fundo<strong id="bgv">—</strong>ppm</div></div>
+  <div class="graph"><svg viewBox="0 0 300 120" preserveAspectRatio="none">
+   <rect id="stabZone" x="30" y="8" width="0" height="92" fill="#ffffff10"/>
+   <line x1="30" y1="8" x2="30" y2="100" stroke="#355766"/><line x1="30" y1="100" x2="295" y2="100" stroke="#355766"/>
+   <text x="2" y="12" id="ymax">0,10</text><text x="8" y="102">0</text><text x="220" y="115">tempo (condensado)</text>
+   <text x="34" y="18" id="stabLbl" fill="#89aab8"></text>
+   <polyline id="line" fill="none" stroke="#65d9f2" stroke-width="2" points=""/>
+  </svg></div>
+ </div>
+
+ <button class="primary" id="run">INICIAR MEDIÇÃO NA POSIÇÃO ATUAL</button>
+
+ <div class="card"><b>Resultados por posição</b>
+  <table class="rtab"><thead><tr><th>Posição</th><th>Média (ppm)</th><th>Máx. (ppm)</th></tr></thead><tbody id="rbody"></tbody></table>
+  <div class="txt" id="maxTxt"></div>
+ </div>
+ <button class="primary green" id="reportBtn" disabled style="display:none">Gerar relatório do ensaio</button>
+
+ <div class="card"><b>Condições simuladas</b><div class="txt">Gás traçador: SF₆ • vazão do ejetor: 4,0 L/min • janela na posição de ensaio • sonda na zona respiratória do manequim, fixa durante a medição.</div></div>
+ <div class="card"><b>Registro de ações</b><div class="log" id="log"><div>Sistema iniciado.</div></div></div>
+ <div class="card"><b>Nota didática</b><div class="txt">O tempo previsto no procedimento real é condensado nesta simulação para tornar a atividade viável em aula. Os resultados são simulados e não constituem certificação.</div></div>
+</aside>
+</main>
+
+<div class="modal" id="report" role="dialog" aria-modal="true" aria-labelledby="rTitle">
+ <div class="sheet">
+  <div class="rhead"><div><h2 id="rTitle">Relatório — Ensaio com Gás Traçador</h2><div>Laboratório Virtual • ABNT NBR 17154:2026</div></div><div class="rbadge" id="rMode"></div></div>
+  <div class="rgrid">
+   <div class="rbox"><b>Condições registradas</b><br>Gás traçador: SF₆ • vazão 4,0 L/min<br>Exaustão: ligada • Janela: posição de ensaio<br>Nível de fundo: <span id="rBg"></span> ppm<br>Data: <span id="rDate"></span></div>
+   <div class="rbox"><b>Identificação</b><label for="rName" style="margin-top:6px">Aluno / investigador</label><input id="rName" placeholder="Nome completo"><label for="rHood">Capela</label><input id="rHood" value="CE-01"></div>
+  </div>
+  <h3>Resultados por posição</h3>
+  <table class="rtable"><thead><tr><th>Posição</th><th>Média (ppm)</th><th>Máximo (ppm)</th></tr></thead><tbody id="rBody"></tbody></table>
+  <div class="rbox" style="margin-top:10px"><b>Maior nível de controle posicional:</b> <span id="rMax"></span>
+   <div class="crit" style="margin-top:8px"><label for="rCrit" style="margin:0">Critério de aceitação definido para o exercício (ppm):</label><input id="rCrit" inputmode="decimal" value="0,10"></div>
+   <div id="rVerdict"></div>
+  </div>
+  <div id="rGab"></div>
+  <div id="rErrors"></div>
+  <label for="q1">1. Qual posição apresentou o maior nível de concentração e o que esse resultado indica?</label><textarea id="q1"></textarea>
+  <label for="q2">2. Que condições podem explicar a diferença entre as posições?</label><textarea id="q2"></textarea>
+  <label for="q3">3. Conclusão técnica e recomendações.</label><textarea id="q3"></textarea>
+  <div class="ractions"><button class="rprimary" id="printBtn">Imprimir / salvar em PDF</button><button class="rsecondary" id="closeReport">Voltar ao laboratório</button></div>
+ </div>
+</div>
+
+<script>
+(()=>{
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+const POS=['left','center','right'], PNAME={left:'Esquerda',center:'Centro',right:'Direita'};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const fmt=(v,d=3)=>v.toFixed(d).replace('.',',');
+
+/* =================== Estado =================== */
+let mode='learn',learned=false,practiced=false;
+let det='off',bg=null,exhaust=false,sash=false,gas=false,pos='center',running=false,timer=null;
+let results={},vals=[],stabN=0,fault=null,errors=[],leakDemo=false;
+// Nível base por posição (ppm) — sorteado levemente a cada rodada
+let base={};
+function newBase(){base={left:rnd(.022,.038),center:rnd(.012,.024),right:rnd(.026,.044)}}
+
+/* =================== Utilitários =================== */
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove('show'),2600)}
+function log(t){const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' — '+t;$('#log').prepend(d)}
+function err(t){errors.push(t);log('⚠ '+t)}
+
+/* =================== Planta (posições) =================== */
+const PX={left:70,center:150,right:230};
+function renderPlan(){
+ $('#planPos').innerHTML=POS.map(p=>{const x=PX[p],sel=p===pos,r=results[p];
+  return `<g class="posG" data-p="${p}" role="button" tabindex="0" aria-label="Posição ${PNAME[p]}">
+   <rect x="${x-30}" y="24" width="60" height="120" fill="transparent"/>
+   <rect x="${x-8}" y="58" width="16" height="10" rx="2" fill="${sel?'#5d737c':'#b8c6c9'}"/>
+   <circle class="ring" cx="${x}" cy="102" r="13" fill="${sel?'#d5b399':'#e9eff0'}" stroke="${sel?'#1684aa':'#8aa0a8'}" stroke-width="${sel?3:1.5}"/>
+   <path d="M${x-5} 90 L${x} 84 L${x+5} 90" fill="none" stroke="${sel?'#735f55':'#8aa0a8'}" stroke-width="1.5"/>
+   <text x="${x}" y="130" text-anchor="middle" font-size="9" font-weight="900" fill="${sel?'#0a6f93':'#4d626a'}">${PNAME[p].toUpperCase()}</text>
+   <text x="${x}" y="143" text-anchor="middle" font-size="8" font-weight="700" fill="${r?'#1c7a4c':'#8aa0a8'}">${r?fmt(r.avg)+' ppm':'—'}</text>
+  </g>`}).join('')+`<text x="150" y="50" text-anchor="middle" font-size="7" fill="#4d626a">ejetor ▭  •  manequim ◯</text>`;
+ $$('.posG').forEach(g=>{const f=()=>selectPos(g.dataset.p);g.onclick=f;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}}});
+}
+function selectPos(p){
+ if(mode==='learn')return toast('No APRENDER, o posicionamento é feito pela demonstração.');
+ if(running)return toast('Não reposicione o conjunto durante a medição.');
+ pos=p;renderPlan();log('Conjunto posicionado: '+PNAME[p]+'.');
+}
+
+/* =================== Detector =================== */
+function setLcd(v){const l=$('#lcd');l.classList.toggle('off',det!=='on');$('#ppm').textContent=det==='off'?'----':det==='warm'?'. . .':fmt(v,2)}
+function detPower(on,cb){
+ if(!on){det='off';bg=null;setLcd();$('#detStatus').textContent='Desligado';$('#bgv').textContent='—';updateCtrls();return}
+ det='warm';setLcd();$('#detStatus').textContent='Aquecendo e estabilizando…';updateCtrls();
+ setTimeout(()=>{if(det!=='warm')return;det='on';setLcd(0);$('#detStatus').textContent='Estável • resposta verificada';updateCtrls();cb&&cb()},mode==='learn'?1200:2200);
+}
+$('#detBtn').onclick=()=>{
+ if(mode==='learn')return toast('No APRENDER, os instrumentos são operados pela demonstração.');
+ if(running){abort('O detector foi desligado durante a medição.')}
+ detPower(det==='off');log('Detector '+(det==='off'?'desligado':'ligado')+'.');
+};
+function measureBg(cb){
+ if(det!=='on'){toast('Ligue o detector e aguarde a estabilização.');err('Tentativa de medir o fundo com o detector não estabilizado.');return}
+ if(gas){toast('Feche o gás: o nível de fundo é medido sem liberação do traçador.');err('Tentativa de medir o fundo com o gás liberado.');return}
+ $('#detStatus').textContent='Medindo nível de fundo…';$('#bgBtn').disabled=true;let n=0,acc=0;
+ const t=setInterval(()=>{const v=rnd(.001,.006);acc+=v;n++;setLcd(v);if(n>=14){clearInterval(t);bg=acc/n;$('#bgv').textContent=fmt(bg);$('#detStatus').textContent='Fundo registrado: '+fmt(bg)+' ppm';updateCtrls();log('Nível de fundo registrado: '+fmt(bg)+' ppm.');cb&&cb()}},90);
+}
+$('#bgBtn').onclick=()=>{if(mode==='learn')return toast('No APRENDER, os instrumentos são operados pela demonstração.');measureBg()};
+
+/* =================== Controles da capela =================== */
+function updateCtrls(){
+ $('#exhBtn').textContent='EXAUSTÃO • '+(exhaust?'ON':'OFF');$('#exhBtn').classList.toggle('on',exhaust);
+ $('#sashBtn').textContent='JANELA • '+(sash?'ENSAIO':'FECHADA');$('#sashBtn').classList.toggle('on',sash);
+ $('#gasBtn').textContent='GÁS SF₆ • '+(gas?'LIBERADO':'FECHADO');$('#gasBtn').classList.toggle('gasOn',gas);
+ $('#detBtn').textContent=det==='off'?'POWER':'DESLIGAR';$('#detBtn').classList.toggle('on',det!=='off');
+ $('#bgBtn').disabled=det!=='on'||running;
+ $('#sashG').style.transform=sash?'translateY(0)':'translateY(76px)';
+}
+function guardLearn(){if(mode==='learn'){toast('No APRENDER, a condição é controlada pela demonstração.');return true}return false}
+$('#exhBtn').onclick=()=>{if(guardLearn())return;if(running)abort('A exaustão foi alterada durante a medição.');exhaust=!exhaust;updateCtrls();log('Exaustão '+(exhaust?'ligada':'desligada')+'.');if(!exhaust&&gas)toast('Atenção: gás liberado com a exaustão desligada!')};
+$('#sashBtn').onclick=()=>{if(guardLearn())return;if(running)abort('A janela foi movimentada durante a medição.');sash=!sash;updateCtrls();log('Janela '+(sash?'na posição de ensaio':'fechada')+'.')};
+$('#gasBtn').onclick=()=>{
+ if(guardLearn())return;
+ if(!gas&&!exhaust){err('Gás liberado com a exaustão desligada.');toast('Não libere o gás com a exaustão desligada.');return}
+ if(running)abort('O gás foi fechado durante a medição.');
+ gas=!gas;updateCtrls();log('Gás traçador '+(gas?'liberado (4,0 L/min)':'fechado')+'.');
+};
+
+/* =================== Medição =================== */
+function missing(){
+ if(det!=='on')return'Ligue o detector e aguarde a estabilização.';
+ if(bg==null)return'Meça o nível de fundo antes de liberar o gás.';
+ if(!exhaust)return'Ligue a exaustão da capela.';
+ if(!sash)return'Coloque a janela na posição de ensaio.';
+ if(!gas)return'Libere o gás traçador pelo ejetor.';
+ return'';
+}
+function target(p){
+ // Concentração média esperada na zona respiratória (ppm)
+ if(leakDemo||(fault&&fault.pos===p))return .55;
+ return base[p];
+}
+function sampleValue(p){
+ const b=target(p), leaky=leakDemo||(fault&&fault.pos===p);
+ let v=b*(1+(Math.random()-.5)*.6)+bg;
+ if(leaky&&Math.random()<.14)v+=rnd(.5,1.6); // picos intermitentes de escape
+ return Math.max(0,v);
+}
+function run(p,{fast=false,onDone}={}){
+ if(running)return;
+ const m=missing();if(m){toast(m);err('Medição iniciada sem preparação completa ('+m.replace(/\.$/,'').toLowerCase()+').');return}
+ running=true;updateCtrls();$('#run').disabled=true;vals=[];stabN=8;
+ const N=48, dt=fast?45:95;let n=0;const target0=target(p);
+ log('Medição iniciada na posição '+PNAME[p]+'.');
+ timer=setInterval(()=>{
+  n++;let v;
+  if(n<=stabN){v=bg+(target0)*(n/stabN)*rnd(.7,1.1)}else v=sampleValue(p);
+  vals.push(v);setLcd(v);$('#cur').textContent=fmt(v);drawGraph();
+  if(n>=N){
+   clearInterval(timer);timer=null;running=false;
+   const rec=vals.slice(stabN), avg=rec.reduce((a,b)=>a+b,0)/rec.length, mx=Math.max(...rec);
+   results[p]={avg,max:mx};$('#avg').textContent=fmt(avg);
+   renderResults();renderPlan();updateCtrls();$('#run').disabled=false;
+   log('Posição '+PNAME[p]+' registrada: média '+fmt(avg)+' ppm.');
+   onDone&&onDone();checkDone();
+  }
+ },dt);
+}
+function abort(reason){
+ if(!running)return;clearInterval(timer);timer=null;running=false;vals=[];drawGraph();
+ err(reason+' Leituras descartadas.');toast(reason+' As leituras foram descartadas.');$('#run').disabled=false;updateCtrls();
+}
+$('#run').onclick=()=>{if(mode==='learn')return toast('No APRENDER, a medição é feita pela demonstração.');run(pos)};
+function drawGraph(){
+ const mx=Math.max(.1,...vals)*1.1;
+ $('#ymax').textContent=fmt(mx,2);
+ const N=48,xs=i=>30+i*(265/(N-1));
+ $('#line').setAttribute('points',vals.map((v,i)=>`${xs(i).toFixed(1)},${(100-v/mx*92).toFixed(1)}`).join(' '));
+ $('#stabZone').setAttribute('width',vals.length?(xs(Math.min(stabN,vals.length))-30):0);
+ $('#stabLbl').textContent=vals.length?'estabilização (descartada)':'';
+}
+function renderResults(){
+ const done=POS.filter(p=>results[p]);const hi=done.length?done.reduce((a,b)=>results[a].avg>=results[b].avg?a:b):null;
+ $('#rbody').innerHTML=POS.map(p=>{const r=results[p];return `<tr><td>${PNAME[p]}</td><td class="${p===hi&&done.length===3?'hi':''}">${r?fmt(r.avg):'—'}</td><td>${r?fmt(r.max):'—'}</td></tr>`}).join('');
+ $('#maxTxt').textContent=done.length===3?`Maior nível de controle posicional: ${fmt(results[hi].avg)} ppm (${PNAME[hi]}).`:'';
+}
+function checkDone(){
+ if(POS.every(p=>results[p])){
+  $('#reportBtn').disabled=false;
+  if(mode==='practice'&&!practiced){practiced=true;unlock('eval');toast('Prática concluída. AVALIAÇÃO liberada.');log('Prática concluída.')}
+  else if(mode==='eval')toast('Três posições medidas. Gere o relatório.');
+ }
+}
+
+/* =================== Animação do gás (vista lateral) =================== */
+const stage=$('#stage'),cv=$('#gasCanvas'),ctx=cv.getContext('2d');let map={s:1,ox:0,oy:0,dpr:1};
+function layout(){const r=stage.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);const s=Math.min(r.width/760,r.height/440);map={s,ox:(r.width-760*s)/2,oy:(r.height-440*s)/2,dpr}}
+new ResizeObserver(layout).observe(stage);
+const UP=[[611,200],[611,120],[608,60],[604,6]];
+const CAPT=[[[476,246],[510,247],[560,250],[594,250],...UP],[[476,244],[505,236],[545,214],[594,184],...UP],[[476,242],[500,226],[540,170],[594,128],...UP]];
+const LEAK=[[[476,244],[455,232],[432,210],[418,188],[406,164],[400,150],[380,140],[350,130]],[[476,244],[450,240],[428,228],[412,212],[398,196],[380,190],[350,180]]];
+let parts=[],lastSpawn=0;
+const sprite=document.createElement('canvas');sprite.width=sprite.height=64;
+(()=>{const c=sprite.getContext('2d'),g=c.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(90,200,240,.9)');g.addColorStop(.45,'rgba(100,205,240,.45)');g.addColorStop(1,'rgba(100,205,240,0)');c.fillStyle=g;c.fillRect(0,0,64,64)})();
+function catmull(pts,n=60){const P=[pts[0],...pts,pts[pts.length-1]],out=[];for(let i=1;i<P.length-2;i++){const[p0,p1,p2,p3]=[P[i-1],P[i],P[i+1],P[i+2]],k=Math.max(2,Math.round(n/(P.length-3)));for(let j=0;j<k;j++){const t=j/k,t2=t*t,t3=t2*t;out.push([0,1].map(d=>.5*((2*p1[d])+(-p0[d]+p2[d])*t+(2*p0[d]-5*p1[d]+4*p2[d]-p3[d])*t2+(-p0[d]+3*p1[d]-3*p2[d]+p3[d])*t3)))}}out.push(P[P.length-2]);return out}
+const jit=(pts,a)=>pts.map((p,i)=>i===0?[p[0]+rnd(-2,2),p[1]+rnd(-2,2)]:[p[0]+rnd(-a,a),p[1]+rnd(-a,a)]);
+function spawn(now){
+ const leaky=leakDemo||(fault&&fault.pos===pos);
+ let path,dur,r1,cap=true;
+ if(!exhaust){path=[[476,244],[476+rnd(-30,20),rnd(200,230)],[rnd(380,470),rnd(150,210)],[rnd(300,420),rnd(100,200)]];dur=rnd(4000,5500);r1=rnd(16,26);cap=false}
+ else if(leaky&&Math.random()<.4){path=LEAK[Math.random()<.6?0:1];dur=rnd(2600,3400);r1=rnd(12,20);cap=false}
+ else{path=CAPT[Math.random()<.5?0:Math.random()<.6?1:2];dur=rnd(2200,3000);r1=rnd(8,13)}
+ parts.push({born:now,dur,path:catmull(jit(path,cap?4:7)),r1,cap,ph:rnd(0,6)});
+}
+function sample(path,u){const n=path.length-1,x=u*n,i=Math.min(n-1,Math.floor(x)),f=x-i,a=path[i],b=path[i+1]||a;return[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]}
+function frame(now){
+ if(gas&&now-lastSpawn>45){spawn(now);lastSpawn=now}
+ parts=parts.filter(p=>now-p.born<p.dur);
+ const {s,ox,oy,dpr}=map;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cv.width,cv.height);ctx.setTransform(dpr*s,0,0,dpr*s,dpr*ox,dpr*oy);
+ for(const p of parts){const t=(now-p.born)/p.dur,[x,y]=sample(p.path,t),r=3+p.r1*Math.min(1,t*2.5)*(p.cap&&t>.7?(1-(t-.7)/.3*.7):1);
+  let a=.55*Math.min(1,t/.1);if(t>.7)a*=1-(t-.7)/.3;ctx.globalAlpha=a;ctx.drawImage(sprite,x-r,y-r+Math.sin(now/300+p.ph),r*2,r*2)}
+ ctx.globalAlpha=1;
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* =================== APRENDER =================== */
+const guides=[
+ {t:'1. Preparar o detector',x:'Ligue o detector e aguarde a estabilização. Antes de liberar o gás, determina-se o nível de fundo da sala e verifica-se a resposta do detector.',
+  go:done=>{detPower(true,()=>measureBg(done))}},
+ {t:'2. Preparar a capela',x:'A exaustão é ligada e a janela é colocada na posição definida para o ensaio.',go:done=>{exhaust=true;sash=true;updateCtrls();setTimeout(done,700)}},
+ {t:'3. Posicionar ejetor e manequim',x:'O conjunto é ensaiado em três posições: esquerda, centro e direita (veja a planta). O ejetor fica dentro da capela, sobre a bancada; o manequim fica diante da abertura, voltado para a capela.',go:done=>{pos='center';renderPlan();done()}},
+ {t:'4. Posicionar a sonda',x:'A sonda é fixada na zona respiratória do manequim, junto à boca, e não é segurada durante a medição. A mangueira leva a amostra de ar até o detector.',go:done=>{$('#probeTip').classList.add('probePulse');done()}},
+ {t:'5. Liberar o gás',x:'O gás traçador (SF₆) é liberado pelo ejetor com vazão de 4,0 L/min. Com a capela funcionando bem, ele é conduzido para o defletor e para o duto.',go:done=>{$('#probeTip').classList.remove('probePulse');gas=true;updateCtrls();setTimeout(done,600)}},
+ {t:'6. Registrar a concentração',x:'Após o período inicial de estabilização (faixa clara do gráfico, descartada), a concentração é registrada ao longo do tempo. No procedimento real, são pelo menos 5 min, com no mínimo uma leitura por segundo.',go:done=>run('center',{onDone:done})},
+ {t:'7. Repetir nas três posições',x:'Ejetor e manequim são relocalizados para a esquerda e para a direita, e a medição é repetida. Obtém-se um nível de controle posicional para cada posição.',go:done=>{pos='left';renderPlan();run('left',{fast:true,onDone:()=>{pos='right';renderPlan();run('right',{fast:true,onDone:done})}})}},
+ {t:'8. Interpretar',x:'O resultado do ensaio é o maior dos níveis de controle posicionais. Ele deve ser comparado com o critério de aceitação aplicável. Use "Ver exemplo de vazamento" para observar como uma falha de contenção aparece no gráfico.',go:done=>{$('#leakBtn').style.display='inline-block';done()}}
+];
+let gi=0;
+function guide(){
+ const g=guides[gi];$('#gcount').textContent=`APRENDER • ETAPA ${gi+1} DE ${guides.length}`;$('#gtitle').textContent=g.t;$('#gtext').textContent=g.x;
+ $('#gnext').textContent=gi===guides.length-1?'Concluir APRENDER':'Próxima etapa';$('#gnext').disabled=true;
+ g.go(()=>{$('#gnext').disabled=false;if(gi===guides.length-1)$('#gtext').textContent=g.x+' '+($('#maxTxt').textContent||'')});
+}
+$('#gnext').onclick=()=>{
+ if(gi<guides.length-1){gi++;guide();return}
+ leakDemo=false;learned=true;unlock('practice');toast('APRENDER concluído. PRATICAR liberado.');log('Demonstração concluída.');setMode('practice');
+};
+$('#leakBtn').onclick=()=>{
+ if(running)return;leakDemo=true;$('#leakBtn').disabled=true;$('#gnext').disabled=true;
+ $('#gtext').textContent='Exemplo de vazamento: parte do gás escapa pela borda da janela e chega à zona respiratória. O gráfico mostra nível elevado e picos intermitentes, típicos de escapes causados por correntes cruzadas ou turbulência na face.';
+ log('Exemplo de vazamento exibido.');
+ pos='center';renderPlan();const saved=results.center;run('center',{fast:true,onDone:()=>{leakDemo=false;results.center=saved;renderResults();renderPlan();$('#leakBtn').disabled=false;$('#gnext').disabled=false}});
+};
+
+/* =================== Modos =================== */
+function unlock(m){const b=$(`.mode[data-mode="${m}"]`);b.classList.remove('lock');b.textContent=m==='practice'?'PRATICAR':'AVALIAÇÃO';b.title=''}
+function setMode(m){
+ if(m==='practice'&&!learned)return toast('Conclua o APRENDER primeiro.');
+ if(m==='eval'&&!practiced)return toast('Conclua o PRATICAR primeiro.');
+ if(timer){clearInterval(timer);timer=null}running=false;
+ mode=m;$$('.mode').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));
+ results={};vals=[];errors=[];leakDemo=false;parts=[];newBase();
+ det='off';bg=null;exhaust=false;sash=false;gas=false;pos='center';setLcd();$('#detStatus').textContent='Desligado';
+ $('#cur').textContent='—';$('#avg').textContent='—';$('#bgv').textContent='—';
+ $('#probeTip').classList.remove('probePulse');$('#leakBtn').style.display='none';
+ fault=m==='eval'?{pos:POS[Math.floor(Math.random()*3)]}:null;
+ $('#guide').style.display=m==='learn'?'block':'none';
+ $('#run').style.display=m==='learn'?'none':'block';$('#run').disabled=false;
+ $('#reportBtn').style.display=m==='learn'?'none':'block';$('#reportBtn').disabled=true;
+ renderResults();renderPlan();drawGraph();updateCtrls();
+ if(m==='learn'){$('#stitle').textContent='APRENDER • Ensaio demonstrado';$('#stext').textContent='Acompanhe a preparação, o posicionamento e a leitura do gás traçador. Depois você executará o procedimento.';gi=0;guide()}
+ else{
+  $('#stitle').textContent=m==='practice'?'PRATICAR • Execute o ensaio':'AVALIAÇÃO • Execute e interprete';
+  $('#stext').textContent=m==='practice'?'Siga a sequência: detector → nível de fundo → exaustão → janela → gás → medição nas três posições (clique na planta para trocar de posição).':'Sem dicas durante o procedimento. Uma das posições pode apresentar uma condição diferente. Meça as três posições e gere o relatório.';
+  log('Modo '+(m==='practice'?'PRATICAR':'AVALIAÇÃO')+' iniciado.');
+ }
+}
+$$('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
+/* =================== Relatório =================== */
+function parseNum(s){const v=parseFloat(String(s).replace(',','.'));return Number.isFinite(v)?v:null}
+function verdict(){
+ const crit=parseNum($('#rCrit').value),hi=POS.reduce((a,b)=>results[a].avg>=results[b].avg?a:b),mx=results[hi].avg;
+ if(crit==null){$('#rVerdict').innerHTML='';return}
+ const ok=mx<=crit;
+ $('#rVerdict').innerHTML=`<div class="verdict ${ok?'ok':'bad'}">${ok?'Atende':'Não atende'} ao critério do exercício: maior nível posicional de ${fmt(mx)} ppm ${ok?'≤':'>'} ${String(crit).replace('.',',')} ppm.</div>`;
+}
+$('#rCrit').addEventListener('input',verdict);
+$('#reportBtn').onclick=()=>{
+ if(!POS.every(p=>results[p]))return;
+ const hi=POS.reduce((a,b)=>results[a].avg>=results[b].avg?a:b);
+ $('#rMode').textContent=mode==='eval'?'Modo Avaliação':'Modo Praticar';
+ $('#rDate').textContent=new Date().toLocaleDateString('pt-BR');$('#rBg').textContent=bg!=null?fmt(bg):'—';
+ $('#rBody').innerHTML=POS.map(p=>`<tr class="${p===hi?'hi':''}"><td>${PNAME[p]}</td><td>${fmt(results[p].avg)}</td><td>${fmt(results[p].max)}</td></tr>`).join('');
+ $('#rMax').textContent=`${fmt(results[hi].avg)} ppm (posição ${PNAME[hi]})`;verdict();
+ $('#rGab').innerHTML=mode==='eval'?`<div class="gab"><b>Condição simulada nesta rodada:</b> escape de gás na posição <b>${PNAME[fault.pos]}</b>, com concentração elevada e picos intermitentes na zona respiratória. Situação compatível com corrente de ar cruzada ou turbulência na face da capela daquele lado (difusor de insuflação, porta, circulação de pessoas) ou com separação do escoamento na borda da janela.</div>`:'';
+ $('#rErrors').innerHTML=`<div class="rbox" style="margin-top:10px"><b>Registro de procedimento:</b> ${errors.length?errors.length+' ocorrência(s):<ul style="margin:6px 0 0 18px;padding:0">'+errors.map(e=>'<li>'+e.replace(/[<>&]/g,'')+'</li>').join('')+'</ul>':'nenhuma ação fora da sequência foi registrada.'}</div>`;
+ $('#report').classList.add('open');log('Relatório gerado.');
+};
+$('#closeReport').onclick=()=>$('#report').classList.remove('open');
+$('#printBtn').onclick=()=>window.print();
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#report').classList.remove('open')});
+
+/* =================== Início =================== */
+layout();setMode('learn');
+})();
+</script></body></html>

@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratório Virtual — Controle VAV da Velocidade de Face</title>
+<style>
+:root{--line:#365c6d;--c:#63daf3;--ok:#66d49a;--warn:#ffd36b;--bad:#ff8a7a;--txt:#edf9fc;--mut:#abc3ce}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#06131b,#102b39);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--txt)}
+button,input,textarea{font:inherit}
+header{min-height:65px;background:#081b26;border-bottom:1px solid #294a5a;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px}
+.brand b{font-size:18px}.brand small{display:block;color:#91adba;margin-top:3px}
+.badge{font-size:11px;border:1px solid #456b7c;border-radius:999px;padding:7px 10px;color:#b4ecf7;white-space:nowrap}
+.modes{display:flex;gap:8px;padding:11px 18px;background:#0a1d28;border-bottom:1px solid #294a5a;flex-wrap:wrap}
+.mode{border:1px solid #3b6071;background:#102d3b;color:#fff;border-radius:8px;padding:9px 15px;font-weight:900;cursor:pointer}
+.mode.on{background:#1684aa;border-color:#69dff5}.mode.lock{opacity:.4;cursor:not-allowed}
+main{display:grid;grid-template-columns:minmax(700px,1fr) 390px;gap:12px;padding:12px}
+
+/* ---------- Laboratório ---------- */
+.lab{position:relative;display:grid;grid-template-rows:auto 1fr;min-height:720px;border:1px solid var(--line);border-radius:17px;overflow:hidden;background:#dce7e9;box-shadow:0 18px 40px #0006}
+.instr{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:10px;padding:10px;background:#0c2532;border-bottom:1px solid #2c5061}
+.panel{background:#123343;border:1px solid #4a7383;border-radius:11px;padding:9px;min-width:0}
+.panel>b{display:block;font-size:10px;letter-spacing:.06em;color:#9deaf8;margin-bottom:6px}
+.anemRow{display:grid;grid-template-columns:62px 1fr;gap:8px;align-items:center}
+.rotorBox{width:62px;height:62px;border-radius:50%;border:7px solid #294d62;background:radial-gradient(circle,#d3e4ea 0 55%,#a9c3cc 100%);position:relative}
+.rotorBox svg{position:absolute;inset:0;width:100%;height:100%}
+.lcd{background:#b9d8bd;color:#183528;border:4px solid #233d46;border-radius:6px;padding:5px 8px;font-family:Consolas,"Courier New",monospace;display:flex;justify-content:space-between;align-items:baseline}
+.lcd strong{font-size:24px}.lcd span{font-size:10px;font-weight:700}
+.lcd.off{background:#6f8573;color:#44564a}
+.small{font-size:10px;color:#abc3cc;margin-top:5px;line-height:1.4;min-height:14px}
+.ctrl{width:100%;border:0;border-radius:7px;padding:8px 6px;background:#d8e4e8;color:#16313d;font-weight:900;cursor:pointer;font-size:11px}
+.ctrl.on{background:#6ed49d}.ctrl:disabled{opacity:.45;cursor:not-allowed}
+.vavGrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px}
+.vcell{background:#b9d8bd;border:3px solid #233d46;border-radius:5px;padding:4px 5px;color:#183528;font-family:Consolas,"Courier New",monospace}
+.vcell small{display:block;font-size:8px;font-family:Inter,Segoe UI,Arial,sans-serif;font-weight:800;color:#2f5140}
+.vcell strong{font-size:16px}
+.bar{height:6px;background:#263f4b;border-radius:5px;overflow:hidden;margin:4px 0 6px}.bar i{display:block;height:100%;width:0;background:#63d9f2}
+.bar i.sat{background:#ff8a7a}
+.sashBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.sashBtns .ctrl.sel{background:#7fdcf2}
+.stage{position:relative;min-height:430px}
+.stage svg,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage canvas{pointer-events:none}
+.legend{position:absolute;left:10px;bottom:10px;background:#08222fe6;border:1px solid #3f6a7c;border-radius:9px;padding:7px 9px;font-size:10px;color:#cfe3ea;max-width:280px;line-height:1.45}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.toast{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#08222f;border:1px solid #64d9f2;padding:9px 13px;border-radius:8px;z-index:40;opacity:0;transition:.2s;font-size:12px;pointer-events:none;max-width:80%;text-align:center}
+.toast.show{opacity:1}
+
+/* ---------- Painel lateral ---------- */
+.side{background:#0b202b;border:1px solid #345666;border-radius:16px;padding:14px;overflow:auto;max-height:calc(100vh - 150px)}
+.side h2{margin:0 0 5px;font-size:17px}.side>p{font-size:12px;color:#adc4ce;line-height:1.5;margin:0 0 6px}
+.card{background:#102d3a;border:1px solid #345a6c;border-radius:10px;padding:10px;margin:9px 0}
+.card>b{font-size:11px;letter-spacing:.03em}
+.card .txt{font-size:11px;line-height:1.45;color:#b9ced6;margin-top:4px}
+.guide small{color:#75dff4;font-weight:900;font-size:10px;letter-spacing:.08em}
+.guide h3{margin:4px 0 6px;font-size:16px}
+.guide p{font-size:12px;line-height:1.5;color:#c9dbe2;margin:0 0 8px}
+.guide .actions{display:flex;gap:6px;flex-wrap:wrap}
+.guide button{border:0;border-radius:7px;padding:8px 10px;font-weight:900;cursor:pointer;font-size:12px}
+.guide .go{background:#168ab2;color:#fff}.guide .warnBtn{background:#f3cf73;color:#16313d}
+.guide button:disabled{opacity:.4;cursor:not-allowed}
+.metric{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.m{background:#0a222e;border-radius:7px;padding:7px;font-size:10px;color:#9fb8c3}
+.m strong{display:block;font-size:17px;color:#9beafa}
+.m strong.okc{color:var(--ok)}.m strong.warnc{color:var(--warn)}
+.graph{height:140px;background:#081d27;border:1px solid #315465;border-radius:8px;margin-top:6px}
+.graph svg{width:100%;height:100%;display:block}
+.graph text{fill:#89aab8;font-size:8px}
+.rtab{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+.rtab th,.rtab td{padding:5px 2px;border-bottom:1px solid #294551;text-align:center}
+.rtab th{color:#9fb8c3;font-weight:700}
+.primary{width:100%;border:0;border-radius:8px;padding:10px;background:#1689b0;color:#fff;font-weight:900;cursor:pointer;margin-top:6px}
+.primary.green{background:#2d9f70}
+.primary:disabled{opacity:.35;cursor:not-allowed}
+.log{max-height:140px;overflow:auto;font-size:10px;color:#a9c1cb}.log div{padding:5px 0;border-bottom:1px solid #294551}
+
+/* ---------- Relatório ---------- */
+.modal{display:none;position:fixed;inset:0;z-index:100;background:#020a10cc;overflow:auto;padding:24px}
+.modal.open{display:block}
+.sheet{max-width:920px;margin:0 auto;background:#f7fafb;color:#18303f;border-radius:14px;padding:24px;box-shadow:0 20px 70px #0008}
+.sheet h2{margin:0}.sheet h3{margin:18px 0 8px}
+.rhead{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #26485b;padding-bottom:10px}
+.rbadge{align-self:start;padding:6px 10px;border-radius:999px;background:#e3edf1;font-weight:800;font-size:12px;white-space:nowrap}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.rbox{border:1px solid #c5d2d8;border-radius:10px;padding:10px;background:#fff;font-size:13px;line-height:1.55}
+.rtable{width:100%;border-collapse:collapse;font-size:13px}
+.rtable th,.rtable td{border:1px solid #bdcbd1;padding:7px;text-align:center}
+.rtable th{background:#e6eef1}
+.okc{color:#1c7a4c;font-weight:800}.badc{color:#b23a2b;font-weight:800}
+.crit{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.crit label{margin:0!important}
+.crit input{width:90px!important}
+.gab{padding:10px;border-radius:8px;background:#fff4d9;border:1px solid #d9ad4e;margin:10px 0;font-size:13px;line-height:1.5}
+.sheet label{display:block;font-weight:800;margin:12px 0 5px;font-size:13px}
+.sheet textarea,.sheet input{width:100%;border:1px solid #aabcc5;border-radius:8px;padding:9px;background:#fff;color:#18303f}
+.sheet textarea{min-height:80px;resize:vertical}
+.ractions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.ractions button{border:0;border-radius:8px;padding:10px 13px;font-weight:800;cursor:pointer}
+.rprimary{background:#176c91;color:#fff}.rsecondary{background:#dce6ea;color:#18303f}
+
+@media(max-width:1150px){main{grid-template-columns:1fr}.side{max-height:none}}
+@media(max-width:760px){main{padding:8px}.instr{grid-template-columns:1fr}header{flex-wrap:wrap}.lab{min-height:0}.stage{min-height:320px}.rgrid{grid-template-columns:1fr}.legend{display:none}}
+@media print{
+ @page{size:A4;margin:12mm}
+ body{background:#fff}
+ header,.modes,main{display:none!important}
+ .modal{display:block!important;position:static;background:#fff;padding:0}
+ .sheet{box-shadow:none;padding:0;max-width:none}
+ .ractions{display:none}
+ .rbox,.gab,tr{break-inside:avoid}
+}
+</style></head>
+<body>
+<header>
+ <div class="brand"><b>Laboratório Virtual — Controle da Velocidade de Face em Sistema VAV</b><small>Capela de exaustão com volume de ar variável • simulação didática</small></div>
+ <div class="badge">ABNT NBR 17154:2026 • 7.2</div>
+</header>
+<div class="modes">
+ <button class="mode on" data-mode="learn">APRENDER</button>
+ <button class="mode lock" data-mode="practice" title="Conclua o APRENDER primeiro">PRATICAR 🔒</button>
+ <button class="mode lock" data-mode="eval" title="Conclua o PRATICAR primeiro">AVALIAÇÃO 🔒</button>
+</div>
+<main>
+<section class="lab" id="lab">
+ <div class="instr">
+  <div class="panel">
+   <b>TERMOANEMÔMETRO • NA FACE</b>
+   <div class="anemRow">
+    <div class="rotorBox"><svg viewBox="-40 -40 80 80" aria-hidden="true"><defs><path id="pa" d="M0 -6 C6 -12 8 -24 3 -33 C-2 -37 -10 -33 -10 -25 C-10 -17 -5 -10 0 -6 Z" fill="#102838"/></defs><g id="rotor"><use href="#pa"/><use href="#pa" transform="rotate(72)"/><use href="#pa" transform="rotate(144)"/><use href="#pa" transform="rotate(216)"/><use href="#pa" transform="rotate(288)"/><circle r="8" fill="#67889b" stroke="#18374a" stroke-width="3"/></g></svg></div>
+    <div><div class="lcd off" id="lcd"><strong id="vel">----</strong><span>m/s</span></div></div>
+   </div>
+   <div style="margin-top:6px"><button class="ctrl" id="anemBtn">POWER</button></div>
+  </div>
+  <div class="panel">
+   <b>CONTROLADOR VAV</b>
+   <div class="vavGrid">
+    <div class="vcell"><small>SETPOINT</small><strong>0,50</strong></div>
+    <div class="vcell"><small>SENSOR VAV (m/s)</small><strong id="vCtrl">0,50</strong></div>
+    <div class="vcell"><small>VAZÃO REL.</small><strong id="qPct">—</strong></div>
+   </div>
+   <div class="small" style="margin:0">Abertura do registro (damper): <b id="dPct">—</b></div>
+   <div class="bar"><i id="dBar"></i></div>
+   <button class="ctrl" id="calBtn">VERIFICAR CALIBRAÇÃO</button>
+   <div class="small" id="calStatus">Calibração não verificada.</div>
+  </div>
+  <div class="panel">
+   <b>POSIÇÃO DA JANELA</b>
+   <div class="sashBtns"><button class="ctrl" data-s="25">25%</button><button class="ctrl" data-s="50">50%</button><button class="ctrl" data-s="100">OPERAÇÃO</button></div>
+   <div class="small" id="sashStatus"></div>
+   <div class="small" id="respStatus"></div>
+  </div>
+ </div>
+
+ <div class="stage" id="stage">
+  <svg id="front" viewBox="0 0 600 520" preserveAspectRatio="xMidYMid meet" aria-label="Vista frontal da capela VAV">
+   <defs>
+    <linearGradient id="gBody" x1="0" x2="1"><stop offset="0" stop-color="#c3ccce"/><stop offset=".4" stop-color="#f0f3f2"/><stop offset="1" stop-color="#aab7b9"/></linearGradient>
+    <linearGradient id="gDuct" x1="0" x2="1"><stop offset="0" stop-color="#657982"/><stop offset=".48" stop-color="#c5d0d3"/><stop offset="1" stop-color="#526871"/></linearGradient>
+    <linearGradient id="gHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef2f2"/><stop offset="1" stop-color="#aebbbd"/></linearGradient>
+    <linearGradient id="gBaffle" x1="0" x2="1"><stop offset="0" stop-color="#a4b2b5"/><stop offset=".5" stop-color="#cfd8da"/><stop offset="1" stop-color="#a0aeb1"/></linearGradient>
+    <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3bfc1"/><stop offset="1" stop-color="#d7dfe0"/></linearGradient>
+    <clipPath id="sashClip"><rect x="88" y="142" width="424" height="332"/></clipPath>
+   </defs>
+   <!-- duto com registro (damper) do VAV -->
+   <rect x="255" y="0" width="90" height="72" fill="url(#gDuct)" stroke="#455a63" stroke-width="2"/>
+   <line id="damper" x1="262" y1="36" x2="338" y2="36" stroke="#1e3a45" stroke-width="5" stroke-linecap="round"/>
+   <circle cx="300" cy="36" r="4" fill="#c9d6da" stroke="#1e3a45"/>
+   <text x="352" y="30" font-size="9" font-weight="800" fill="#4d626a">REGISTRO VAV</text>
+   <text x="352" y="42" font-size="9" font-weight="700" fill="#4d626a" id="damperLbl"></text>
+   <!-- corpo -->
+   <rect x="60" y="62" width="480" height="424" rx="6" fill="url(#gBody)" stroke="#52656b" stroke-width="3"/>
+   <rect x="100" y="150" width="400" height="320" fill="#98a8ac"/>
+   <polygon points="100,150 500,150 460,172 140,172" fill="#8d9ea3"/>
+   <polygon points="100,150 140,172 140,442 100,470" fill="#a9b7ba"/>
+   <polygon points="500,150 460,172 460,442 500,470" fill="#93a4a8"/>
+   <polygon points="100,470 500,470 460,442 140,442" fill="url(#gFloor)"/>
+   <rect x="140" y="172" width="320" height="270" fill="url(#gBaffle)" stroke="#708187"/>
+   <rect x="160" y="214" width="280" height="9" rx="4" fill="#34505b"/>
+   <rect x="160" y="314" width="280" height="9" rx="4" fill="#34505b"/>
+   <rect x="160" y="424" width="280" height="9" rx="4" fill="#34505b"/>
+   <!-- grade de medição: acompanha a abertura abaixo da janela -->
+   <g id="gridG" stroke="#1686a8" stroke-width="1.5" stroke-dasharray="5 4" fill="none" opacity=".85"></g>
+   <!-- janela -->
+   <g clip-path="url(#sashClip)"><g id="sashG">
+    <rect x="94" y="-100" width="412" height="360" fill="#d8f6ff" fill-opacity=".2" stroke="#778e95" stroke-width="5"/>
+    <line x1="120" y1="-40" x2="230" y2="200" stroke="#fff" stroke-opacity=".25" stroke-width="10"/>
+    <rect x="92" y="252" width="416" height="11" rx="3" fill="#526b74"/>
+   </g></g>
+   <rect x="96" y="466" width="408" height="7" fill="#6d8188"/>
+   <rect x="90" y="474" width="420" height="12" rx="6" fill="#b9c5c8" stroke="#687c83"/>
+   <!-- cabeçote -->
+   <rect x="72" y="70" width="456" height="72" fill="url(#gHead)" stroke="#62757b" stroke-width="2"/>
+   <text x="300" y="112" text-anchor="middle" font-size="11" font-weight="900" fill="#4d626a" id="headTxt">CAPELA VAV • CE-02</text>
+   <!-- régua de abertura -->
+   <g font-size="9" font-weight="800" fill="#4d626a">
+    <line x1="520" y1="250" x2="520" y2="470" stroke="#4d626a"/>
+    <line x1="515" y1="250" x2="525" y2="250" stroke="#4d626a"/><text x="528" y="253">Operação</text>
+    <line x1="515" y1="360" x2="525" y2="360" stroke="#4d626a"/><text x="528" y="363">50%</text>
+    <line x1="515" y1="415" x2="525" y2="415" stroke="#4d626a"/><text x="528" y="418">25%</text>
+   </g>
+  </svg>
+  <canvas id="flowCanvas"></canvas>
+  <div class="legend"><i style="background:#3ec3e8"></i>ar entrando dentro da faixa do setpoint<br><i style="background:#f3b64a"></i>ar entrando abaixo da faixa • <i style="background:#e8604f"></i>acima da faixa<br>Quantidade de pontos ∝ vazão; velocidade dos pontos ∝ velocidade de face.</div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+ </div>
+</section>
+
+<aside class="side">
+ <h2 id="st">APRENDER • Controle VAV</h2>
+ <p id="sp">Observe como a abertura da janela altera a vazão de exaustão enquanto o VAV procura manter a velocidade de face no setpoint.</p>
+
+ <div class="card guide" id="guide">
+  <small id="gc"></small><h3 id="gt"></h3><p id="gx"></p>
+  <div class="actions"><button class="warnBtn" id="faultBtn" style="display:none">Ver exemplo de falha</button><button class="go" id="gn">Próxima etapa</button></div>
+ </div>
+
+ <div class="card"><b>Velocidade de face × tempo (últimos 30 s)</b>
+  <div class="metric"><div class="m">Face (anem.)<strong id="mV">—</strong>m/s</div><div class="m">Vazão rel.<strong id="mQ">—</strong>%</div><div class="m">Estado<strong id="mS" style="font-size:13px">—</strong></div></div>
+  <div class="graph"><svg viewBox="0 0 300 130" preserveAspectRatio="none" id="gsvg">
+   <rect x="28" y="0" width="267" height="0" fill="#2d9f7033" id="band"/>
+   <line x1="28" y1="0" x2="295" y2="0" stroke="#66d49a" stroke-dasharray="4 3" id="spLine"/>
+   <line x1="28" y1="6" x2="28" y2="112" stroke="#355766"/><line x1="28" y1="112" x2="295" y2="112" stroke="#355766"/>
+   <text x="2" y="10">0,80</text><text x="2" y="62">0,40</text><text x="10" y="114">0</text><text x="220" y="126">tempo (s)</text>
+   <g id="marks"></g>
+   <rect id="measZone" x="0" y="6" width="0" height="106" fill="#63daf322"/>
+   <polyline id="line" fill="none" stroke="#65d9f2" stroke-width="2" points=""/>
+  </svg></div>
+ </div>
+
+ <button class="primary" id="measure">MEDIR VELOCIDADE DE FACE</button>
+
+ <div class="card"><b>Resultados por posição da janela</b>
+  <table class="rtab"><thead><tr><th>Janela</th><th>Média</th><th>Mín.</th><th>Máx.</th><th>Resposta</th></tr></thead><tbody id="tbody"></tbody></table>
+  <div class="txt">Velocidades em m/s. Resposta = tempo para a velocidade voltar à faixa de ±10% do setpoint após o movimento da janela.</div>
+ </div>
+ <button class="primary green" id="reportBtn" style="display:none" disabled>Gerar relatório do ensaio</button>
+
+ <div class="card"><b>Registro de ações</b><div class="log" id="log"><div>Sistema iniciado.</div></div></div>
+ <div class="card"><b>Nota didática</b><div class="txt">O tempo de aquisição foi condensado para a aula. O critério de desempenho depende das especificações de projeto da capela; os limites usados no relatório são valores do exercício, editáveis pelo professor.</div></div>
+</aside>
+</main>
+
+<div class="modal" id="report" role="dialog" aria-modal="true" aria-labelledby="rTitle">
+ <div class="sheet">
+  <div class="rhead"><div><h2 id="rTitle">Relatório — Controle VAV da Velocidade de Face</h2><div>Laboratório Virtual • ABNT NBR 17154:2026</div></div><div class="rbadge" id="rMode"></div></div>
+  <div class="rgrid">
+   <div class="rbox"><b>Condições registradas</b><br>Capela: VAV (CE-02)<br>Setpoint do controlador: 0,50 m/s<br>Calibração do VAV: verificada antes do ensaio<br>Data: <span id="rDate"></span></div>
+   <div class="rbox"><b>Identificação</b><label for="rName" style="margin-top:6px">Aluno / investigador</label><input id="rName" placeholder="Nome completo"></div>
+  </div>
+  <div class="rbox"><b>Critérios do exercício (editáveis)</b>
+   <div class="crit"><label for="cV">Velocidade de face de projeto (m/s):</label><input id="cV" value="0,50"><label for="cT">Tolerância (±%):</label><input id="cT" value="10"><label for="cR">Tempo de resposta máximo (s):</label><input id="cR" value="3"></div>
+  </div>
+  <h3>Resultados</h3>
+  <table class="rtable"><thead><tr><th>Posição da janela</th><th>Média (m/s)</th><th>Mín.</th><th>Máx.</th><th>Velocidade</th><th>Tempo de resposta</th><th>Resposta</th></tr></thead><tbody id="rBody"></tbody></table>
+  <div id="rGab"></div>
+  <div id="rErrors"></div>
+  <label for="q1">1. O sistema VAV manteve a velocidade de face nas três posições da janela? Justifique com os resultados.</label><textarea id="q1"></textarea>
+  <label for="q2">2. Como o controlador respondeu às mudanças de posição da janela (vazão, registro e tempo de resposta)?</label><textarea id="q2"></textarea>
+  <label for="q3">3. Conclusão técnica e recomendações.</label><textarea id="q3"></textarea>
+  <div class="ractions"><button class="rprimary" id="printBtn">Imprimir / salvar em PDF</button><button class="rsecondary" id="closeReport">Voltar ao laboratório</button></div>
+ </div>
+</div>
+
+<script>
+(()=>{
+const $=q=>document.querySelector(q),$$=q=>[...document.querySelectorAll(q)];
+const POS=[25,50,100], PN={25:'25%',50:'50%',100:'Operação'};
+const AREA={25:.25,50:.5,100:1}; // área relativa à abertura de operação
+const SP=.5, BAND=.10;
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const fmt=(v,d=2)=>v.toFixed(d).replace('.',',');
+const gauss=()=>{let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+
+/* =================== Estado =================== */
+let mode='learn',learned=false,practiced=false;
+let anemOn=false,calOk=false,calBusy=false;
+// Modelo: v = SP·Q/A. O VAV ajusta Q em direção a Q* = A·(ganho) com constante de tempo tau; Q limitado a Qmax.
+let sim={A:.25,Atarget:.25,Q:.25,tau:.8,Qmax:1.15,sensorGain:1,t:0};
+let sashPos=25,moveT0=null,moveTo=null,inBandSince=null,respTimes={};
+let fault=null; // {type:'lento'|'saturado'|'descal', label}
+let running=false,meas=null,results={},errors=[],hist=[],marks=[],vNow=0,stableNow=true;
+
+/* =================== Utilitários =================== */
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove('show'),2800)}
+function log(t){const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' — '+t;$('#log').prepend(d)}
+function err(t){errors.push(t);log('⚠ '+t)}
+
+/* =================== Física do VAV =================== */
+function applyFault(f){
+ sim.tau=.8;sim.Qmax=1.15;sim.sensorGain=1;
+ if(!f)return;
+ if(f.type==='lento')sim.tau=5.5;           // atuador lento / malha mal sintonizada
+ if(f.type==='saturado')sim.Qmax=.80;       // registro já 100% aberto antes de atingir a vazão necessária
+ if(f.type==='descal')sim.sensorGain=1.25;  // sensor do VAV lê 25% acima do real → controla com velocidade real menor
+}
+function step(dt){
+ sim.t+=dt;
+ // janela desliza (~0,7 s)
+ const dA=sim.Atarget-sim.A;sim.A+=Math.sign(dA)*Math.min(Math.abs(dA),dt*1.1);
+ // controlador: busca vazão para que a velocidade LIDA pelo sensor seja o setpoint
+ const Qstar=Math.min(sim.Qmax,Math.max(.12,sim.A/sim.sensorGain));
+ sim.Q+=(Qstar-sim.Q)*(1-Math.exp(-dt/sim.tau));
+ const vTrue=SP*sim.Q/sim.A;
+ vNow=Math.max(0,vTrue*(1+.035*gauss()));
+ // tempo de resposta após movimento da janela
+ const inBand=Math.abs(vTrue-SP)<=SP*BAND;
+ if(moveT0!=null){
+  if(inBand&&Math.abs(sim.A-sim.Atarget)<1e-3){if(inBandSince==null)inBandSince=sim.t;if(sim.t-inBandSince>=.6){respTimes[moveTo]=inBandSince-moveT0;log('VAV estabilizado em '+PN[moveTo]+': tempo de resposta '+fmt(respTimes[moveTo],1)+' s.');moveT0=null;inBandSince=null}}
+  else inBandSince=null;
+  // registro saturado (100% aberto) e velocidade ainda fora da faixa: o setpoint não será atingido
+  const sat=sim.Q>=sim.Qmax-1e-3&&!inBand&&Math.abs(sim.A-sim.Atarget)<1e-3;
+  if(moveT0!=null&&(sat?(sim.satSince??=sim.t,sim.t-sim.satSince>=4):(sim.satSince=null,false))){respTimes[moveTo]=Infinity;sim.satSince=null;log('Registro 100% aberto: o VAV não consegue atingir o setpoint em '+PN[moveTo]+'.');moveT0=null}
+  if(moveT0!=null&&sim.t-moveT0>30){respTimes[moveTo]=Infinity;log('VAV não retornou à faixa do setpoint em 30 s ('+PN[moveTo]+').');moveT0=null}
+ }
+ stableNow=moveT0==null;
+ hist.push([sim.t,vNow]);while(hist.length&&hist[0][0]<sim.t-30)hist.shift();
+ while(marks.length&&marks[0][0]<sim.t-30)marks.shift();
+}
+function setSash(p,{silent=false}={}){
+ if(running){abort('A janela foi movimentada durante a medição.')}
+ if(p===sashPos&&!silent)return;
+ sashPos=p;sim.Atarget=AREA[p];
+ if(!silent){moveT0=sim.t;moveTo=p;inBandSince=null;marks.push([sim.t,PN[p]]);log('Janela ajustada para '+PN[p]+'.')}
+ $$('.sashBtns .ctrl').forEach(b=>b.classList.toggle('sel',+b.dataset.s===p));
+}
+$$('.sashBtns .ctrl').forEach(b=>b.onclick=()=>{if(mode==='learn')return toast('No APRENDER, a janela é movida pela demonstração.');setSash(+b.dataset.s)});
+
+/* =================== Instrumentos =================== */
+$('#anemBtn').onclick=()=>{if(mode==='learn')return toast('No APRENDER, os instrumentos são operados pela demonstração.');if(running)abort('O anemômetro foi desligado durante a medição.');anemOn=!anemOn;log('Anemômetro '+(anemOn?'ligado':'desligado')+'.')};
+function verifyCal(cb){
+ if(calBusy)return;calBusy=true;$('#calStatus').textContent='Verificando calibração…';
+ setTimeout(()=>{calBusy=false;calOk=true;$('#calStatus').textContent='Calibração verificada conforme recomendações do fabricante.';$('#calBtn').classList.add('on');$('#calBtn').textContent='CALIBRAÇÃO VERIFICADA';log('Calibração do controle VAV verificada.');cb&&cb()},mode==='learn'?900:1500);
+}
+$('#calBtn').onclick=()=>{if(mode==='learn')return toast('No APRENDER, a verificação é feita pela demonstração.');if(!calOk)verifyCal()};
+
+/* =================== Medição =================== */
+function run(p,{onDone}={}){
+ if(running)return;
+ if(!calOk){toast('Verifique a calibração do controle VAV antes das medições.');err('Medição tentada sem verificar a calibração do VAV.');return}
+ if(!anemOn){toast('Ligue o anemômetro.');err('Medição tentada com o anemômetro desligado.');return}
+ if(!stableNow){err('Medição iniciada antes da estabilização do VAV em '+PN[p]+'.');toast('Atenção: o VAV ainda não estabilizou. As leituras incluirão o transitório.')}
+ running=true;$('#measure').disabled=true;meas={p,t0:sim.t,vals:[]};log('Medição iniciada em '+PN[p]+'.');
+ meas.onDone=onDone;
+}
+function tickMeasure(){
+ if(!running||!meas)return;
+ if(meas.vals.length<25&&sim.t-meas.t0>=meas.vals.length*.2){meas.vals.push(vNow)}
+ if(meas.vals.length>=25){
+  const v=meas.vals,avg=v.reduce((a,b)=>a+b,0)/v.length;results[meas.p]={avg,min:Math.min(...v),max:Math.max(...v)};
+  running=false;$('#measure').disabled=false;log('Resultado em '+PN[meas.p]+': média '+fmt(avg,3)+' m/s.');
+  const cb=meas.onDone;meas=null;renderResults();cb&&cb();checkDone();
+ }
+}
+function abort(reason){if(!running)return;running=false;meas=null;$('#measure').disabled=false;err(reason+' Leituras descartadas.');toast(reason+' As leituras foram descartadas.')}
+$('#measure').onclick=()=>{if(mode==='learn')return toast('No APRENDER, a medição é feita pela demonstração.');run(sashPos)};
+function fmtResp(t){return t==null?'—':t===Infinity?'não atingiu':fmt(t,1)+' s'}
+function renderResults(){
+ $('#tbody').innerHTML=POS.map(p=>{const r=results[p];return `<tr><td>${PN[p]}</td><td>${r?fmt(r.avg,3):'—'}</td><td>${r?fmt(r.min,3):'—'}</td><td>${r?fmt(r.max,3):'—'}</td><td>${fmtResp(respTimes[p])}</td></tr>`}).join('');
+}
+function checkDone(){
+ if(POS.every(p=>results[p])){
+  $('#reportBtn').disabled=false;
+  if(mode==='practice'&&!practiced){practiced=true;unlock('eval');toast('Prática concluída. AVALIAÇÃO liberada.');log('Prática concluída.')}
+  else if(mode==='eval')toast('Três posições medidas. Gere o relatório.');
+ }
+}
+
+/* =================== Desenho =================== */
+const stage=$('#stage'),cv=$('#flowCanvas'),ctx=cv.getContext('2d');let map={s:1,ox:0,oy:0,dpr:1};
+function layout(){const r=stage.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);const s=Math.min(r.width/600,r.height/520);map={s,ox:(r.width-600*s)/2,oy:(r.height-520*s)/2,dpr}}
+new ResizeObserver(layout).observe(stage);
+const sashBottom=()=>470-220*sim.A;
+let dots=[],spawnAcc=0,angle=0;
+function drawScene(dt){
+ const sb=sashBottom();
+ $('#sashG').setAttribute('transform',`translate(0 ${sb-252})`);
+ // grade 4 × 2 na abertura
+ const g=$('#gridG'),top=sb+10,bot=466,h=bot-top;
+ let s=`<rect x="104" y="${top}" width="392" height="${Math.max(0,h)}"/>`;
+ for(let i=1;i<4;i++)s+=`<line x1="${104+i*98}" y1="${top}" x2="${104+i*98}" y2="${bot}"/>`;
+ s+=`<line x1="104" y1="${top+h/2}" x2="496" y2="${top+h/2}"/>`;g.innerHTML=h>8?s:'';
+ // registro: 0% = fechado (horizontal), 100% = totalmente aberto (vertical)
+ const dp=Math.min(1,sim.Q/sim.Qmax), ang=dp*80*Math.PI/180;
+ $('#damper').setAttribute('x1',300-38*Math.cos(ang));$('#damper').setAttribute('y1',36-38*Math.sin(ang)*.45);
+ $('#damper').setAttribute('x2',300+38*Math.cos(ang));$('#damper').setAttribute('y2',36+38*Math.sin(ang)*.45);
+ $('#damperLbl').textContent='aberto '+Math.round(dp*100)+'%';
+ // pontos de ar entrando pela abertura
+ const {s:sc,ox,oy,dpr}=map;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,cv.width,cv.height);ctx.setTransform(dpr*sc,0,0,dpr*sc,dpr*ox,dpr*oy);
+ spawnAcc+=dt*sim.Q*55;
+ while(spawnAcc>1){spawnAcc--;const x=rnd(110,490),y=rnd(sb+8,460);if(y<sb+6)continue;dots.push({x0:x,y0:y,x1:300+(x-300)*.72,y1:[218,318,428].reduce((a,b)=>Math.abs(b-y)<Math.abs(a-y)?b:a),t:0})}
+ const v=SP*sim.Q/sim.A, col=v<SP*(1-BAND)?'#f3b64a':v>SP*(1+BAND)?'#e8604f':'#3ec3e8';
+ ctx.fillStyle=col;
+ dots=dots.filter(p=>{p.t+=dt*v*1.4;if(p.t>=1)return false;const x=p.x0+(p.x1-p.x0)*p.t,y=p.y0+(p.y1-p.y0)*p.t,r=3.2*(1-p.t*.75);ctx.globalAlpha=.8*(1-p.t*.6);ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill();return true});
+ ctx.globalAlpha=1;
+ // anemômetro
+ if(anemOn){angle=(angle+vNow*900*dt)%360}
+ $('#rotor').setAttribute('transform',`rotate(${angle.toFixed(1)})`);
+ const l=$('#lcd');l.classList.toggle('off',!anemOn);$('#vel').textContent=anemOn?fmt(vNow):'----';
+ // controlador
+ $('#vCtrl').textContent=fmt(Math.min(9.99,SP*sim.Q/sim.A*sim.sensorGain));
+ $('#qPct').textContent=Math.round(sim.Q*100)+'%';
+ $('#dPct').textContent=Math.round(dp*100)+'%'+(dp>.985&&v<SP*(1-BAND)?' • SATURADO':'');
+ $('#dBar').style.width=(dp*100)+'%';$('#dBar').classList.toggle('sat',dp>.985);
+ $('#sashStatus').textContent='Janela: '+PN[sashPos]+(Math.abs(sim.A-sim.Atarget)>1e-3?' (movendo…)':'');
+ $('#respStatus').textContent=moveT0!=null?'VAV ajustando a vazão… '+fmt(sim.t-moveT0,1)+' s':'VAV estável.';
+ // métricas e gráfico
+ $('#mV').textContent=anemOn?fmt(vNow):'—';$('#mQ').textContent=Math.round(sim.Q*100);
+ const ms=$('#mS');ms.textContent=moveT0!=null?'ajustando':'estável';ms.className=moveT0!=null?'warnc':'okc';
+ drawGraph();
+}
+function drawGraph(){
+ const y=v=>112-Math.min(.8,v)/.8*106, x=t=>28+(t-(sim.t-30))/30*267;
+ $('#band').setAttribute('y',y(SP*(1+BAND)));$('#band').setAttribute('height',y(SP*(1-BAND))-y(SP*(1+BAND)));
+ $('#spLine').setAttribute('y1',y(SP));$('#spLine').setAttribute('y2',y(SP));
+ $('#line').setAttribute('points',anemOn?hist.map(([t,v])=>`${x(t).toFixed(1)},${y(v).toFixed(1)}`).join(' '):'');
+ $('#marks').innerHTML=marks.map(([t,l])=>`<line x1="${x(t)}" y1="6" x2="${x(t)}" y2="112" stroke="#ffd36b" stroke-dasharray="2 2"/><text x="${x(t)+2}" y="14" fill="#ffd36b">${l}</text>`).join('');
+ const mz=$('#measZone');if(running&&meas){mz.setAttribute('x',Math.max(28,x(meas.t0)));mz.setAttribute('width',Math.max(0,x(sim.t)-Math.max(28,x(meas.t0))))}else mz.setAttribute('width',0);
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;step(dt);tickMeasure();drawScene(dt);requestAnimationFrame(frame)}
+
+/* =================== APRENDER =================== */
+const wait=(ms,f)=>setTimeout(f,ms);
+function waitStable(cb){const t=setInterval(()=>{if(stableNow){clearInterval(t);cb()}},200)}
+const guides=[
+ {t:'1. Verificação do controle VAV',x:'Antes das medições, verifica-se se a calibração do controle VAV atende às recomendações do fabricante. O anemômetro é ligado para acompanhar a velocidade real na face.',go:done=>{anemOn=true;verifyCal(done)}},
+ {t:'2. Ajuste para 25%',x:'A janela é baixada para 25% da abertura de operação. Observe: a área diminui, a velocidade sobe momentaneamente (pontos vermelhos) e o VAV fecha o registro até a velocidade voltar ao setpoint. Aguarde a estabilização.',go:done=>{setSash(25);waitStable(done)}},
+ {t:'3. Medição em 25%',x:'Com o sistema estável, mede-se a velocidade de face na abertura (grade com sensor fixo; aqui a aquisição é condensada). A faixa azul do gráfico indica o período de medição.',go:done=>run(25,{onDone:done})},
+ {t:'4. Ajuste para 50%',x:'A janela sobe para 50%. A área dobra, a velocidade cai pela metade no primeiro instante (pontos amarelos) e o VAV abre o registro para aumentar a vazão. O tempo até voltar à faixa é o tempo de resposta.',go:done=>{setSash(50);waitStable(done)}},
+ {t:'5. Medição em 50%',x:'Após a estabilização, repete-se a medição da velocidade de face e registra-se o resultado.',go:done=>run(50,{onDone:done})},
+ {t:'6. Abertura de operação',x:'A janela é colocada na abertura de operação. É a condição de maior área: o registro precisa abrir bastante para manter a velocidade.',go:done=>{setSash(100);waitStable(done)}},
+ {t:'7. Medição na abertura de operação',x:'A medição é repetida na abertura de operação e os resultados são registrados.',go:done=>run(100,{onDone:done})},
+ {t:'8. Comparação',x:'Compare as médias das três posições entre si e com a velocidade de projeto, e verifique o tempo de resposta do controlador. Use "Ver exemplo de falha" para observar um VAV com resposta lenta.',go:done=>{$('#faultBtn').style.display='inline-block';done()}}
+];
+let gi=0;
+function guide(){
+ const g=guides[gi];$('#gc').textContent=`APRENDER • ETAPA ${gi+1} DE ${guides.length}`;$('#gt').textContent=g.t;$('#gx').textContent=g.x;
+ $('#gn').textContent=gi===guides.length-1?'Concluir APRENDER':'Próxima etapa';$('#gn').disabled=true;
+ g.go(()=>{$('#gn').disabled=false});
+}
+$('#gn').onclick=()=>{if(gi<guides.length-1){gi++;guide();return}applyFault(null);learned=true;unlock('practice');toast('APRENDER concluído. PRATICAR liberado.');log('Demonstração concluída.');setMode('practice')};
+$('#faultBtn').onclick=()=>{
+ $('#faultBtn').disabled=true;$('#gn').disabled=true;applyFault({type:'lento'});
+ $('#gx').textContent='Exemplo de falha: o atuador do registro está lento. Ao baixar a janela para 25% e subir de novo para a operação, a velocidade demora muito para voltar à faixa do setpoint. Durante esse tempo, a contenção fica comprometida.';
+ log('Exemplo de falha (resposta lenta) iniciado.');
+ const saved={...respTimes};
+ setSash(25);wait(2500,()=>{setSash(100);waitStable(()=>{log('Exemplo de falha: tempo de resposta '+fmtResp(respTimes[100])+'.');respTimes=saved;renderResults();applyFault(null);$('#faultBtn').disabled=false;$('#gn').disabled=false})});
+};
+
+/* =================== Modos =================== */
+function unlock(m){const b=$(`.mode[data-mode="${m}"]`);b.classList.remove('lock');b.textContent=m==='practice'?'PRATICAR':'AVALIAÇÃO';b.title=''}
+const FAULTS=[
+ {type:'lento',label:'Resposta lenta do controlador',txt:'o atuador do registro (ou a sintonia da malha) está lento: após cada movimento da janela, a velocidade demora bem mais que o normal para voltar à faixa do setpoint.',cause:'Atuador com defeito ou sub-dimensionado, sintonia inadequada do controlador ou sensor com resposta lenta.'},
+ {type:'saturado',label:'Vazão insuficiente na abertura de operação',txt:'nas posições de 25% e 50% o VAV mantém a velocidade, mas na abertura de operação o registro chega a 100% sem atingir a vazão necessária; a velocidade de face fica abaixo do setpoint.',cause:'Capacidade insuficiente do sistema de exaustão (ventilador, perdas no duto, filtros saturados) ou registro limitado mecanicamente.'},
+ {type:'descal',label:'Sensor do VAV descalibrado',txt:'o display do controlador indica o setpoint, mas o anemômetro mostra velocidade real cerca de 20% menor em todas as posições: o sensor do VAV lê acima do valor real.',cause:'Sensor de velocidade/pressão do VAV fora de calibração; o controlador "acredita" estar no setpoint.'}
+];
+function setMode(m){
+ if(m==='practice'&&!learned)return toast('Conclua o APRENDER primeiro.');
+ if(m==='eval'&&!practiced)return toast('Conclua o PRATICAR primeiro.');
+ mode=m;$$('.mode').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));
+ running=false;meas=null;results={};respTimes={};errors=[];marks=[];hist=[];
+ calOk=false;$('#calBtn').classList.remove('on');$('#calBtn').textContent='VERIFICAR CALIBRAÇÃO';$('#calStatus').textContent='Calibração não verificada.';
+ fault=m==='eval'?FAULTS[Math.floor(Math.random()*FAULTS.length)]:null;applyFault(fault);
+ // estado inicial: janela na abertura de operação, sistema estabilizado
+ anemOn=false;sim.A=sim.Atarget=1;sim.Q=Math.min(sim.Qmax,1/sim.sensorGain);sashPos=100;moveT0=null;setSash(100,{silent:true});
+ $('#guide').style.display=m==='learn'?'block':'none';$('#faultBtn').style.display='none';$('#faultBtn').disabled=false;
+ $('#measure').style.display=m==='learn'?'none':'block';$('#measure').disabled=false;
+ $('#reportBtn').style.display=m==='learn'?'none':'block';$('#reportBtn').disabled=true;
+ renderResults();
+ if(m==='learn'){$('#st').textContent='APRENDER • Controle VAV';$('#sp').textContent='Observe como a abertura da janela altera a vazão de exaustão enquanto o VAV procura manter a velocidade de face no setpoint.';gi=0;guide()}
+ else{
+  $('#st').textContent=m==='practice'?'PRATICAR • Execute as três condições':'AVALIAÇÃO • Execute e interprete';
+  $('#sp').textContent=m==='practice'?'Verifique a calibração do VAV, ligue o anemômetro, ajuste cada posição da janela, aguarde a estabilização e meça. Compare também o tempo de resposta.':'Sem dicas. Uma condição do sistema VAV pode estar inadequada. Execute o procedimento completo, compare o anemômetro com o controlador e gere o relatório.';
+  log('Modo '+(m==='practice'?'PRATICAR':'AVALIAÇÃO')+' iniciado.');
+ }
+}
+$$('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
+/* =================== Relatório =================== */
+const num=s=>{const v=parseFloat(String(s).replace(',','.'));return Number.isFinite(v)?v:null};
+function fillReport(){
+ const cv=num($('#cV').value)??.5,ct=(num($('#cT').value)??10)/100,cr=num($('#cR').value)??3;
+ $('#rBody').innerHTML=POS.map(p=>{const r=results[p],rt=respTimes[p];const okV=Math.abs(r.avg-cv)<=cv*ct,okR=rt!=null&&rt!==Infinity&&rt<=cr;
+  return `<tr><td>${PN[p]}</td><td>${fmt(r.avg,3)}</td><td>${fmt(r.min,3)}</td><td>${fmt(r.max,3)}</td><td class="${okV?'okc':'badc'}">${okV?'dentro':'fora'} da faixa</td><td>${fmtResp(rt)}</td><td class="${rt==null?'':okR?'okc':'badc'}">${rt==null?'não medido':okR?'atende':'não atende'}</td></tr>`}).join('');
+}
+['cV','cT','cR'].forEach(id=>$('#'+id).addEventListener('input',fillReport));
+$('#reportBtn').onclick=()=>{
+ if(!POS.every(p=>results[p]))return;
+ $('#rMode').textContent=mode==='eval'?'Modo Avaliação':'Modo Praticar';$('#rDate').textContent=new Date().toLocaleDateString('pt-BR');
+ fillReport();
+ $('#rGab').innerHTML=mode==='eval'?`<div class="gab"><b>Condição simulada nesta rodada: ${fault.label}.</b> Neste cenário, ${fault.txt}<br><i>Causas prováveis:</i> ${fault.cause}</div>`:'';
+ const miss=POS.filter(p=>respTimes[p]==null&&!(moveT0!=null&&moveTo===p));const pend=moveT0!=null?moveTo:null;
+ $('#rErrors').innerHTML=`<div class="rbox" style="margin-top:10px"><b>Registro de procedimento:</b> ${errors.length?errors.length+' ocorrência(s):<ul style="margin:6px 0 0 18px;padding:0">'+errors.map(e=>'<li>'+e.replace(/[<>&]/g,'')+'</li>').join('')+'</ul>':'nenhuma ação fora da sequência foi registrada.'}${miss.length?'<br><i>Tempo de resposta não medido em: '+miss.map(p=>PN[p]).join(', ')+' (a janela não foi movida para essa posição durante o ensaio).</i>':''}${pend!=null?'<br><i>Em '+PN[pend]+', o VAV ainda não havia estabilizado quando o relatório foi gerado.</i>':''}</div>`;
+ $('#report').classList.add('open');log('Relatório gerado.');
+};
+$('#closeReport').onclick=()=>$('#report').classList.remove('open');
+$('#printBtn').onclick=()=>window.print();
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#report').classList.remove('open')});
+
+/* =================== Início =================== */
+layout();setMode('learn');requestAnimationFrame(frame);
+})();
+</script></body></html>

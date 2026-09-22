@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laboratório Virtual — Visualização do Fluxo de Ar</title>
+<style>
+:root{--bg:#07151e;--panel:#0d2431;--line:#315568;--cyan:#69d8f2;--text:#eaf7fb;--muted:#a8c0cb;--ok:#63d39a;--warn:#ffd36a;--bad:#ff8a7a}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#06131b,#102c3a);font-family:Inter,Segoe UI,Arial,sans-serif;color:var(--text)}
+button,select,textarea,input{font:inherit}
+header{min-height:64px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #284655;background:#081b26}
+.brand b{font-size:18px}.brand small{display:block;color:#89a9b8;margin-top:3px}
+.badge{font-size:11px;border:1px solid #426678;border-radius:999px;padding:7px 10px;color:#aeeaf7;white-space:nowrap}
+.modes{display:flex;gap:8px;padding:12px 18px;background:#0a1d28;border-bottom:1px solid #284655;flex-wrap:wrap}
+.mode{padding:9px 16px;border-radius:9px;border:1px solid #365c6e;background:#102b39;color:#dff7fc;font-weight:800;cursor:pointer}
+.mode.on{background:#167fa4;border-color:#63d8f2}.mode.lock{opacity:.42;cursor:not-allowed}
+main{display:grid;grid-template-columns:minmax(640px,1fr) 370px;gap:12px;padding:12px;min-height:calc(100vh - 113px)}
+
+/* ---------- Laboratório ---------- */
+.lab{position:relative;min-height:690px;border:1px solid #345666;border-radius:18px;overflow:hidden;background:linear-gradient(#dce7e9 0 74%,#aab8ba 74%);box-shadow:0 18px 45px #0006}
+.stage{position:absolute;top:16px;bottom:16px;left:178px;right:178px}
+.stage svg,.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage canvas{pointer-events:none}
+#sashG{transition:transform .6s ease}
+#darkOverlay{transition:opacity .4s}
+#lightStrip{transition:fill .3s}
+
+.controls{position:absolute;right:14px;top:120px;width:150px;background:#163441;border:2px solid #557684;border-radius:12px;padding:10px;z-index:30;box-shadow:0 10px 20px #0005}
+.controls b{font-size:10px;letter-spacing:.04em}
+.ctrl{width:100%;margin-top:7px;border:0;border-radius:7px;padding:8px;background:#d8e4e8;color:#16313d;font-weight:900;cursor:pointer;font-size:12px}
+.ctrl.on{background:#6ed49d}
+.status{font-size:10px;color:#b8d0da;margin-top:8px;line-height:1.45}
+
+.deviceRef{position:absolute;left:14px;top:120px;width:152px;background:#102d3a;border:2px solid #557987;border-radius:14px;padding:9px;text-align:center;z-index:28;box-shadow:0 10px 22px #0006}
+.deviceRef small{font-size:8px;color:#7edcf3;font-weight:900;letter-spacing:.08em}
+.devBody{margin:8px auto;width:70px;height:96px;border-radius:13px 13px 22px 22px;background:linear-gradient(90deg,#263e49,#9badb4 45%,#344f5a);border:2px solid #a7b9c0;position:relative}
+.devBody:before{content:"";position:absolute;right:-34px;top:16px;width:38px;height:9px;background:#9aabb0;border:1px solid #506771;border-radius:0 6px 6px 0}
+.devBody:after{content:"FUMAÇA";position:absolute;left:0;right:0;top:42px;font-size:8px;font-weight:900;color:#d7e5e9}
+.devText{font-size:9px;color:#b7cad2;line-height:1.4}
+
+.zone{position:absolute;z-index:20;border:2px dashed transparent;border-radius:9px;background:transparent;padding:0;cursor:default}
+.lab.interactive .zone{cursor:pointer;border-color:#1f8fb3aa;background:#36c6ef12}
+.lab.interactive .zone:hover,.lab.interactive .zone:focus-visible{border-color:#0a6f93;background:#6de4ff30;outline:none}
+.lab.interactive .zone.seen{border-style:solid;border-color:#2f9e6a99}
+.zone .zl{position:absolute;left:50%;bottom:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:800;background:#08222fe8;color:#dff7fc;padding:3px 7px;border-radius:6px;opacity:0;pointer-events:none;transition:.15s}
+.lab.interactive .zone:hover .zl,.lab.interactive .zone:focus-visible .zl{opacity:1}
+
+.legend{position:absolute;left:14px;bottom:14px;z-index:26;background:#08222fe0;border:1px solid #3f6a7c;border-radius:10px;padding:8px 10px;font-size:10px;color:#cfe3ea;max-width:260px;line-height:1.45}
+.legend b{color:#9deaf8}
+.toast{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:#08222f;border:1px solid #65d9f1;padding:9px 13px;border-radius:9px;z-index:60;font-size:12px;opacity:0;pointer-events:none;transition:.25s;max-width:80%;text-align:center}
+.toast.show{opacity:1}
+
+/* ---------- Painel lateral ---------- */
+.side{background:#0b202b;border:1px solid #345666;border-radius:16px;padding:14px;overflow:auto;max-height:calc(100vh - 137px)}
+.side h2{font-size:17px;margin:0 0 5px}.side p{font-size:12px;color:#aec6d0;line-height:1.5;margin:0 0 8px}
+.card{background:#102d3a;border:1px solid #345b6d;border-radius:10px;padding:10px;margin:9px 0}
+.card>b{font-size:11px;letter-spacing:.03em}
+.card .txt{font-size:11px;color:#b9ced6;margin-top:5px;line-height:1.45}
+.demoCard small{color:#76dff4;font-weight:900;font-size:10px;letter-spacing:.08em}
+.demoCard h3{margin:4px 0 6px;font-size:16px}
+.info{background:#0b2330;border-radius:8px;padding:8px;margin-top:6px;font-size:11px;line-height:1.45;color:#d3e6ec}
+.info b{color:#9deaf8;font-size:10px;letter-spacing:.05em}
+.info.anom{background:#3a2a12;border:1px solid #a5803a;display:none}.info.anom b{color:var(--warn)}
+.progress{display:flex;gap:5px;margin:10px 0}.dot{height:5px;flex:1;background:#34535f;border-radius:4px}.dot.done{background:#65d9f1}
+.actions{display:flex;gap:6px;flex-wrap:wrap}
+.actions button{padding:8px 10px;border:0;border-radius:7px;font-weight:800;cursor:pointer;background:#dce8ec;color:#16313d;font-size:12px}
+.actions button.warnBtn{background:#f3cf73}
+.actions button.go{background:#168ab2;color:#fff}
+.sideCanvas{width:100%;aspect-ratio:300/220;display:block;background:#dfe8ea;border-radius:8px;margin-top:7px}
+.obsRow{display:grid;grid-template-columns:1fr;gap:4px;padding:7px 0;border-bottom:1px solid #294551}
+.obsRow:last-child{border-bottom:0}
+.obsHead{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800}
+.obsHead i{font-style:normal;font-size:10px;font-weight:700;color:#7f9ba6}
+.obsHead i.ok{color:var(--ok)}
+.obsRow select{width:100%;padding:6px;border-radius:6px;border:1px solid #4a7385;background:#0b2330;color:#eaf7fb;font-size:11px}
+.obsRow select:disabled{opacity:.45}
+.fb{font-size:10px;line-height:1.4}.fb.ok{color:var(--ok)}.fb.bad{color:var(--bad)}
+.primary{width:100%;padding:10px;border:0;border-radius:8px;background:#168ab2;color:white;font-weight:900;cursor:pointer;margin-top:6px}
+.primary.green{background:#2d9f70}
+.primary:disabled{opacity:.35;cursor:not-allowed}
+.log{max-height:150px;overflow:auto;font-size:10px;color:#a9c1cb}.log div{padding:5px 0;border-bottom:1px solid #294551}
+
+/* ---------- Relatório ---------- */
+.modal{display:none;position:fixed;inset:0;z-index:100;background:#020a10cc;overflow:auto;padding:24px}
+.modal.open{display:block}
+.sheet{max-width:900px;margin:0 auto;background:#f7fafb;color:#18303f;border-radius:14px;padding:24px;box-shadow:0 20px 70px #0008}
+.sheet h2{margin:0}.sheet h3{margin:18px 0 8px}
+.rhead{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid #26485b;padding-bottom:10px}
+.rbadge{align-self:start;padding:6px 10px;border-radius:999px;background:#e3edf1;font-weight:800;font-size:12px;white-space:nowrap}
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.rbox{border:1px solid #c5d2d8;border-radius:10px;padding:10px;background:#fff;font-size:13px;line-height:1.55}
+.rtable{width:100%;border-collapse:collapse;font-size:13px}
+.rtable th,.rtable td{border:1px solid #bdcbd1;padding:7px;text-align:left;vertical-align:top}
+.rtable th{background:#e6eef1}
+.okc{color:#1c7a4c;font-weight:800}.badc{color:#b23a2b;font-weight:800}
+.score{padding:10px;border-radius:8px;background:#fff4d9;border:1px solid #d9ad4e;margin:10px 0;font-size:13px;line-height:1.5}
+.sheet label{display:block;font-weight:800;margin:12px 0 5px;font-size:13px}
+.sheet textarea,.sheet input{width:100%;border:1px solid #aabcc5;border-radius:8px;padding:9px;background:#fff;color:#18303f}
+.sheet textarea{min-height:80px;resize:vertical}
+.ractions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.ractions button{border:0;border-radius:8px;padding:10px 13px;font-weight:800;cursor:pointer}
+.rprimary{background:#176c91;color:#fff}.rsecondary{background:#dce6ea;color:#18303f}
+
+@media(max-width:1100px){main{grid-template-columns:1fr}.side{max-height:none}}
+@media(max-width:760px){header{flex-wrap:wrap}.stage{left:10px;right:10px;top:150px}.deviceRef{display:none}.controls{position:absolute;top:10px;right:10px;left:10px;width:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.controls b,.controls .status{grid-column:1/-1}.ctrl{margin-top:0}.legend{display:none}main{min-width:0}.lab{min-height:640px}}
+@media print{
+ @page{size:A4;margin:12mm}
+ body{background:#fff}
+ header,.modes,main{display:none!important}
+ .modal{display:block!important;position:static;background:#fff;padding:0}
+ .sheet{box-shadow:none;padding:0;max-width:none}
+ .ractions{display:none}
+ .rbox,.score,tr{break-inside:avoid}
+}
+</style></head>
+<body>
+<header>
+ <div class="brand"><b>Laboratório Virtual — Visualização do Fluxo de Ar</b><small>Ensaio qualitativo de capela de exaustão • simulação didática</small></div>
+ <div class="badge">Baseado na ABNT NBR 17154:2026 • Seção 8</div>
+</header>
+<div class="modes">
+ <button class="mode on" data-mode="learn">APRENDER</button>
+ <button class="mode lock" data-mode="practice" title="Conclua o APRENDER primeiro">PRATICAR 🔒</button>
+ <button class="mode lock" data-mode="eval" title="Conclua o PRATICAR primeiro">AVALIAÇÃO 🔒</button>
+</div>
+<main>
+<section class="lab" id="lab">
+ <div class="deviceRef"><small>MODELO DE REFERÊNCIA</small><div class="devBody"></div><div class="devText">Gerador de fumaça didático.<br>Na capela, a fumaça sai pelo bico do aplicador (ponto branco).</div></div>
+
+ <div class="stage" id="stage">
+  <!-- Vista frontal da capela. Todas as coordenadas (desenho, fumaça e regiões clicáveis) usam o mesmo sistema 600 × 560 -->
+  <svg id="front" viewBox="0 0 600 560" preserveAspectRatio="xMidYMid meet" aria-label="Vista frontal da capela de exaustão">
+   <defs>
+    <linearGradient id="gBody" x1="0" x2="1"><stop offset="0" stop-color="#c3ccce"/><stop offset=".4" stop-color="#f0f3f2"/><stop offset="1" stop-color="#aab7b9"/></linearGradient>
+    <linearGradient id="gDuct" x1="0" x2="1"><stop offset="0" stop-color="#657982"/><stop offset=".48" stop-color="#c5d0d3"/><stop offset="1" stop-color="#526871"/></linearGradient>
+    <linearGradient id="gHead" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef2f2"/><stop offset="1" stop-color="#aebbbd"/></linearGradient>
+    <linearGradient id="gBaffle" x1="0" x2="1"><stop offset="0" stop-color="#a4b2b5"/><stop offset=".5" stop-color="#cfd8da"/><stop offset="1" stop-color="#a0aeb1"/></linearGradient>
+    <linearGradient id="gFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b3bfc1"/><stop offset="1" stop-color="#d7dfe0"/></linearGradient>
+    <linearGradient id="gFoil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f7f7"/><stop offset=".5" stop-color="#b9c5c8"/><stop offset="1" stop-color="#7b8d93"/></linearGradient>
+    <linearGradient id="gEquip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5d737c"/><stop offset="1" stop-color="#263e49"/></linearGradient>
+    <clipPath id="sashClip"><rect x="88" y="142" width="424" height="332"/></clipPath>
+    <linearGradient id="gBase" x1="0" x2="1"><stop offset="0" stop-color="#8fa2a9"/><stop offset=".5" stop-color="#dce4e6"/><stop offset="1" stop-color="#83969e"/></linearGradient>
+   </defs>
+   <!-- duto -->
+   <rect x="255" y="0" width="90" height="72" fill="url(#gDuct)" stroke="#455a63" stroke-width="2"/>
+   <text x="300" y="30" text-anchor="middle" font-size="9" font-weight="900" fill="#1f3a45">DUTO DE</text>
+   <text x="300" y="41" text-anchor="middle" font-size="9" font-weight="900" fill="#1f3a45">EXAUSTÃO</text>
+   <!-- corpo -->
+   <rect x="60" y="62" width="480" height="424" rx="6" fill="url(#gBody)" stroke="#52656b" stroke-width="3"/>
+   <!-- interior em perspectiva -->
+   <rect x="100" y="150" width="400" height="320" fill="#98a8ac"/>
+   <polygon points="100,150 500,150 460,172 140,172" fill="#8d9ea3"/>
+   <polygon points="100,150 140,172 140,442 100,470" fill="#a9b7ba"/>
+   <polygon points="500,150 460,172 460,442 500,470" fill="#93a4a8"/>
+   <polygon points="100,470 500,470 460,442 140,442" fill="url(#gFloor)"/>
+   <!-- defletor traseiro com fendas -->
+   <rect x="140" y="172" width="320" height="270" fill="url(#gBaffle)" stroke="#708187"/>
+   <rect x="160" y="214" width="280" height="9" rx="4" fill="#34505b"/>
+   <rect x="160" y="314" width="280" height="9" rx="4" fill="#34505b"/>
+   <rect x="160" y="424" width="280" height="9" rx="4" fill="#34505b"/>
+   <text x="300" y="206" text-anchor="middle" font-size="8" font-weight="800" fill="#5a6f77" letter-spacing="1">DEFLETOR (FENDAS)</text>
+   <!-- equipamento sobre a bancada, próximo da frente (lado direito) -->
+   <polygon points="334,380 418,380 410,370 342,370" fill="#7d949c"/>
+   <rect x="334" y="380" width="84" height="80" rx="3" fill="url(#gEquip)" stroke="#81959c" stroke-width="2"/>
+   <rect x="346" y="394" width="40" height="14" rx="2" fill="#9fd6c1" opacity=".75"/>
+   <circle cx="400" cy="440" r="5" fill="#c9d6da"/>
+   <text x="376" y="430" text-anchor="middle" font-size="8" font-weight="800" fill="#d7e5e9">EQUIPAMENTO</text>
+   <!-- escurecimento quando a luz está desligada -->
+   <rect id="darkOverlay" x="100" y="150" width="400" height="320" fill="#0b1820" opacity="0"/>
+   <!-- janela (guilhotina) -->
+   <g clip-path="url(#sashClip)"><g id="sashG">
+    <rect x="94" y="-20" width="412" height="320" fill="#d8f6ff" fill-opacity=".18" stroke="#778e95" stroke-width="5"/>
+    <line x1="120" y1="40" x2="220" y2="250" stroke="#ffffff" stroke-opacity=".25" stroke-width="10"/>
+    <rect x="92" y="292" width="416" height="11" rx="3" fill="#526b74"/>
+   </g></g>
+   <!-- bancada frontal e aerofólio -->
+   <rect x="96" y="466" width="408" height="7" fill="#6d8188"/>
+   <rect x="90" y="474" width="420" height="13" rx="6.5" fill="url(#gFoil)" stroke="#687c83"/>
+   <text x="515" y="484" font-size="8" font-weight="800" fill="#4d626a">aerofólio</text>
+   <!-- cabeçote superior (a janela desliza por trás dele) -->
+   <rect x="72" y="70" width="456" height="72" fill="url(#gHead)" stroke="#62757b" stroke-width="2"/>
+   <rect id="lightStrip" x="200" y="84" width="200" height="6" rx="3" fill="#d8e3e5"/>
+   <circle id="exhLed" cx="505" cy="92" r="5" fill="#667"/>
+   <text x="497" y="95" text-anchor="end" font-size="8" font-weight="800" fill="#4d626a">EXAUSTÃO</text>
+   <!-- base -->
+   <rect x="70" y="488" width="460" height="72" fill="url(#gBase)" stroke="#6d8087"/>
+   <line x1="300" y1="492" x2="300" y2="556" stroke="#6d8087"/>
+  </svg>
+  <canvas id="frontCanvas"></canvas>
+  <div id="zones"></div>
+ </div>
+
+ <div class="controls">
+  <b>CONTROLES DA CAPELA</b>
+  <button class="ctrl" id="exhaustBtn">EXAUSTÃO • OFF</button>
+  <button class="ctrl" id="lightBtn">ILUMINAÇÃO • OFF</button>
+  <button class="ctrl" id="sashBtn">JANELA • FECHADA</button>
+  <div class="status" id="hoodStatus"></div>
+ </div>
+ <div class="legend" id="legend"><b>Leitura da cena:</b> na vista frontal, fumaça que <b>diminui</b> está indo para o fundo (defletor); fumaça que <b>cresce</b> está vindo em direção à face e ao operador. Confira sempre na <b>vista lateral</b>, no painel à direita.</div>
+ <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</section>
+
+<aside class="side">
+ <h2 id="sideTitle">APRENDER • Demonstração guiada</h2>
+ <p id="sideText">Observe cada região antes de executar o ensaio por conta própria.</p>
+
+ <div class="card"><b>Vista lateral (corte)</b><canvas id="sideCanvas" class="sideCanvas" width="600" height="440"></canvas><div class="txt">Operador e face da capela à esquerda; defletor, plenum e duto à direita.</div></div>
+
+ <div class="card demoCard" id="demoCard">
+  <small id="demoCount"></small>
+  <h3 id="demoTitle"></h3>
+  <div class="info"><b>O QUE É FEITO</b><br><span id="demoWhat"></span></div>
+  <div class="info"><b>O QUE OBSERVAR</b><br><span id="demoObserve"></span></div>
+  <div class="info"><b>POR QUE OBSERVAR</b><br><span id="demoWhy"></span></div>
+  <div class="info anom" id="demoAnom"><b>EXEMPLO DE ANOMALIA</b><br><span id="demoAnomText"></span></div>
+  <div class="progress" id="progress"></div>
+  <div class="actions"><button id="replay">Repetir</button><button id="anomBtn" class="warnBtn">Ver anomalia</button><button id="next" class="go">Próxima</button></div>
+ </div>
+
+
+ <div class="card" id="obsCard" style="display:none"><b>Registro de observações</b><div class="txt" id="obsIntro"></div><div id="obsList"></div></div>
+
+ <button class="primary" id="helpBtn" style="display:none">Preciso de um lembrete</button>
+ <button class="primary green" id="reportBtn" style="display:none" disabled>Gerar relatório do ensaio</button>
+
+ <div class="card"><b>Objetivo do ensaio</b><div class="txt">Visualizar qualitativamente como o ar e a fumaça se comportam na capela, procurando sinais de captura, estagnação, fluxo reverso, vórtices e interferências.</div></div>
+ <div class="card"><b>Registro de ações</b><div class="log" id="log"><div>Sistema iniciado.</div></div></div>
+ <div class="card"><b>Importante</b><div class="txt">Os comportamentos desta atividade são simulados para fins didáticos. A norma estabelece o método de ensaio; a interpretação técnica deve considerar projeto, procedimento e condições reais.</div></div>
+</aside>
+</main>
+
+<div class="modal" id="report" role="dialog" aria-modal="true" aria-labelledby="rTitle">
+ <div class="sheet">
+  <div class="rhead"><div><h2 id="rTitle">Relatório — Visualização do Fluxo de Ar</h2><div>Laboratório Virtual • ABNT NBR 17154:2026</div></div><div class="rbadge" id="rMode"></div></div>
+  <div class="rgrid">
+   <div class="rbox"><b>Condições registradas</b><br>Exaustão: ligada<br>Iluminação: ligada<br>Janela: posição de ensaio<br>Fonte: gerador de fumaça com aplicador<br>Data: <span id="rDate"></span></div>
+   <div class="rbox"><b>Identificação</b><label for="rName" style="margin-top:6px">Aluno / investigador</label><input id="rName" placeholder="Nome completo"><label for="rHood">Capela</label><input id="rHood" value="CE-01"></div>
+  </div>
+  <div id="rScore"></div>
+  <h3>Observações por região</h3>
+  <table class="rtable"><thead><tr><th>Região</th><th>Classificação do aluno</th><th id="rExpHead">Comportamento simulado</th></tr></thead><tbody id="rBody"></tbody></table>
+  <div id="rErrors"></div>
+  <label for="rDesc">1. Descreva o comportamento da fumaça na região em que houve anomalia (ou justifique se não houve).</label><textarea id="rDesc"></textarea>
+  <label for="rCause">2. Que condição pode explicar o comportamento observado?</label><textarea id="rCause"></textarea>
+  <label for="rConc">3. Conclusão técnica e recomendações.</label><textarea id="rConc"></textarea>
+  <div class="ractions"><button class="rprimary" id="printBtn">Imprimir / salvar em PDF</button><button class="rsecondary" id="closeReport">Voltar ao laboratório</button></div>
+ </div>
+</div>
+
+<script>
+(()=>{
+const $=q=>document.querySelector(q), $$=q=>[...document.querySelectorAll(q)];
+
+/* =================== Conteúdo didático =================== */
+const REGIONS=[
+ {z:'airfoil',name:'Aerofólio inferior',t:'1. Aerofólio inferior',
+  w:'Uma pequena fonte de fumaça é posicionada logo abaixo do aerofólio inferior, na frente da capela.',
+  o:'Observe se a fumaça é captada suavemente, passa sob o aerofólio e é conduzida junto à bancada até as fendas inferiores do defletor.',
+  y:'Essa região revela o comportamento do ar na entrada inferior da capela, onde o fluxo "varre" a superfície de trabalho.',
+  box:[96,476,190,26]},
+ {z:'work',name:'Superfície e paredes',t:'2. Superfície de trabalho e paredes',
+  w:'A fumaça é liberada ao longo da superfície de trabalho, junto às paredes laterais e nos cantos.',
+  o:'Procure um deslocamento contínuo em direção ao defletor traseiro, observando especialmente os cantos.',
+  y:'Regiões de baixa movimentação indicam estagnação; movimento em direção à face indica fluxo reverso.',
+  box:[106,420,170,44]},
+ {z:'equip',name:'Ao redor do equipamento',t:'3. Ao redor do equipamento',
+  w:'A fumaça é aplicada ao redor de um equipamento colocado dentro da capela.',
+  o:'Observe se a obstrução provoca fluxo lento, recirculação atrás do equipamento ou deslocamento da fumaça para a frente.',
+  y:'Equipamentos e fontes de calor modificam o escoamento e devem ser considerados no ensaio em operação.',
+  box:[322,346,108,116]},
+ {z:'inside',name:'Interior junto à janela',t:'4. Interior junto à janela',
+  w:'A fumaça é liberada dentro da capela, atrás do vidro, acima da borda inferior da janela.',
+  o:'Observe o comportamento atrás da janela e a eventual formação de vórtices.',
+  y:'A região logo atrás da janela é crítica para a contenção: vórtices ali podem levar contaminantes para a abertura.',
+  box:[150,238,150,56]},
+ {z:'outside',name:'Região externa',t:'5. Região externa',
+  w:'A fumaça é liberada fora da capela, próxima à face, na lateral da abertura.',
+  o:'Observe a direção da fumaça e se correntes de ar da sala alteram o fluxo de entrada.',
+  y:'Correntes cruzadas (portas, difusores, passagem de pessoas) podem interferir no desempenho da capela.',
+  box:[4,300,54,160]},
+ {z:'top',name:'Parte superior da abertura',t:'6. Parte superior da abertura',
+  w:'A fumaça é liberada no plano da abertura, logo abaixo da borda inferior da janela.',
+  o:'A fumaça deve ser induzida para dentro da abertura. Acompanhe vórtices e qualquer tendência de retorno em direção à face.',
+  y:'A borda da janela gera separação do escoamento; é um ponto típico de vórtices.',
+  box:[330,304,150,34]}
+];
+const CATS=[['','— classifique o comportamento —'],['captura','Captura adequada (fluxo suave até o defletor)'],['estagnacao','Fluxo lento / estagnação'],['reverso','Fluxo reverso / escape pela face'],['vortice','Vórtice / recirculação'],['cruzada','Interferência de corrente externa']];
+const CATNAME=Object.fromEntries(CATS);
+// Anomalias possíveis: uma é sorteada a cada rodada de PRATICAR e de AVALIAÇÃO
+const FAULTS={
+ work:{cat:'estagnacao',txt:'Estagnação: a fumaça fica parada no canto frontal da bancada e se dissipa ali, sem ser conduzida ao defletor.',cause:'Canto com baixa velocidade do ar (efeito de borda), fendas inferiores do defletor obstruídas ou materiais acumulados sobre a bancada.'},
+ equip:{cat:'reverso',txt:'Fluxo reverso: forma-se recirculação atrás do equipamento e a fumaça é empurrada para a frente, escapando pela face em direção ao operador.',cause:'Equipamento volumoso próximo da abertura e apoiado diretamente na bancada, bloqueando a passagem do ar para as fendas inferiores.'},
+ outside:{cat:'cruzada',txt:'Corrente cruzada: a fumaça liberada fora da capela é arrastada lateralmente pela corrente da sala e não é captada pela abertura.',cause:'Corrente de ar do ambiente (difusor de insuflação, porta aberta ou circulação de pessoas) passando em frente à face.'},
+ top:{cat:'vortice',txt:'Vórtice: logo abaixo da borda da janela a fumaça gira sem seguir para o fundo, e parte dela escapa pela abertura.',cause:'Separação do escoamento na borda inferior da janela (perfil inadequado, janela acima da posição de projeto ou velocidade de face baixa).'}
+};
+
+/* =================== Estado =================== */
+let mode='learn', learned=false, practiced=false, demoIndex=0;
+let exhaust=true, light=true, sashTest=true, fault=null, errors=0;
+const observed=new Set(), answers={};
+
+/* =================== Utilitários =================== */
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.h);toast.h=setTimeout(()=>e.classList.remove('show'),2600)}
+function log(t){const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+' — '+t;$('#log').prepend(d)}
+const R=z=>REGIONS.find(r=>r.z===z);
+const rnd=(a,b)=>a+Math.random()*(b-a);
+
+/* =================== Mapeamento das vistas =================== */
+const stage=$('#stage'), fc=$('#frontCanvas'), fctx=fc.getContext('2d');
+const sc=$('#sideCanvas'), sctx=sc.getContext('2d');
+let map={s:1,ox:0,oy:0,dpr:1};
+function layout(){
+ const r=stage.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+ fc.width=Math.round(r.width*dpr);fc.height=Math.round(r.height*dpr);
+ const s=Math.min(r.width/600,r.height/560);
+ map={s,ox:(r.width-600*s)/2,oy:(r.height-560*s)/2,dpr};
+ $$('.zone').forEach(el=>{const b=R(el.dataset.zone).box;el.style.left=(map.ox+b[0]*s)+'px';el.style.top=(map.oy+b[1]*s)+'px';el.style.width=(b[2]*s)+'px';el.style.height=(b[3]*s)+'px'});
+}
+// Regiões clicáveis
+REGIONS.forEach(r=>{const b=document.createElement('button');b.className='zone';b.dataset.zone=r.z;b.setAttribute('aria-label','Aplicar fumaça: '+r.name);b.innerHTML='<span class="zl">'+r.name+'</span>';b.onclick=()=>applySmoke(r.z);$('#zones').appendChild(b)});
+new ResizeObserver(layout).observe(stage);
+
+/* =================== Trajetórias =================== */
+// f = vista frontal (600×560); s = vista lateral (300×220). Fendas do defletor na vista lateral: y≈60 (superior), 112 (central), 172 (inferior)
+const UP=[[240,150],[242,95],[244,45],[246,4]]; // subida pelo plenum até o duto (vista lateral)
+const loop=(cx,cy,r,turns,a0,n=14)=>Array.from({length:n},(_,i)=>{const a=a0+i/(n-1)*turns*2*Math.PI;return[cx+r*Math.cos(a),cy+r*Math.sin(a)]});
+const PATHS={
+ airfoil:{
+  normal:{f:[[180,498],[196,484],[228,466],[266,450],[300,437],[316,429]],s:[[44,196],[64,190],[110,184],[180,180],[228,174],...UP]},
+  src:{f:[180,500],s:[40,197]}},
+ work:{
+  normal:{f:[[122,452],[160,448],[210,441],[258,434],[285,429]],s:[[82,178],[150,178],[228,174],...UP]},
+  fault:{kind:'stag',f:[[122,452],[134,446],[127,441],[139,447],[131,443],[136,449]],s:[[82,178],[92,172],[86,168],[96,175],[90,170]]},
+  src:{f:[118,454],s:[80,179]}},
+ equip:{
+  normal:{f:[[376,362],[374,346],[380,332],[388,322]],s:[[130,140],[168,132],[210,118],[228,112],...UP]},
+  alt:{f:[[376,362],[352,366],[328,392],[318,418],[330,429]],s:[[130,140],[112,150],[118,170],[190,176],[228,174],...UP]},
+  fault:{kind:'rev',f:[[376,362],[392,350],[400,366],[380,382],[360,420],[340,470],[320,520],[300,570]],s:[[130,140],[150,128],[160,142],[140,150],[110,132],[80,126],[50,132],[15,142]]},
+  src:{f:[376,364],s:[132,141]}},
+ inside:{
+  normal:{f:[[225,282],[232,298],[242,310],[252,318]],s:[[76,96],[120,88],[180,72],[228,60],[238,40],[244,18],[246,4]]},
+  src:{f:[224,280],s:[74,97]}},
+ outside:{
+  normal:{f:[[28,380],[56,384],[88,388],[118,384],[156,368],[196,340],[220,322]],s:[[16,140],[48,140],[82,146],[150,150],[228,112],...UP]},
+  fault:{kind:'cross',f:[[28,380],[16,372],[4,366],[-18,360],[-40,356]],s:[[16,140],[12,132],[8,124],[2,118],[-6,114]]},
+  src:{f:[30,380],s:[18,140]}},
+ top:{
+  normal:{f:[[404,316],[401,322],[398,324],[396,322]],s:[[60,118],[92,124],[160,120],[228,112],...UP]},
+  fault:{kind:'vortex',f:[[404,316],...loop(404,330,15,2,-Math.PI/2)],s:[[60,118],...loop(78,106,11,2,Math.PI/2)],escape:{f:[[404,316],...loop(404,330,15,1.2,-Math.PI/2),[420,360],[445,400],[470,450]],s:[[60,118],...loop(78,106,11,1.2,Math.PI/2),[55,116],[30,112],[4,108]]}},
+  src:{f:[404,314],s:[58,118]}}
+};
+
+/* =================== Sistema de partículas =================== */
+let parts=[], applicator=null;
+function catmull(pts,n=70){
+ if(pts.length<2)return pts;
+ const P=[pts[0],...pts,pts[pts.length-1]],out=[];
+ for(let i=1;i<P.length-2;i++){const[p0,p1,p2,p3]=[P[i-1],P[i],P[i+1],P[i+2]];const k=Math.max(2,Math.round(n/(P.length-3)));
+  for(let j=0;j<k;j++){const t=j/k,t2=t*t,t3=t2*t;out.push([0,1].map(d=>.5*((2*p1[d])+(-p0[d]+p2[d])*t+(2*p0[d]-5*p1[d]+4*p2[d]-p3[d])*t2+(-p0[d]+3*p1[d]-3*p2[d]+p3[d])*t3)))}}
+ out.push(P[P.length-2]);return out;
+}
+const jit=(pts,a,keepFirst=true)=>pts.map((p,i)=>i===0&&keepFirst?[p[0]+rnd(-3,3),p[1]+rnd(-3,3)]:[p[0]+rnd(-a,a),p[1]+rnd(-a,a)]);
+function randomDrift(start,steps,dx,dy){const out=[start];let p=start;for(let i=0;i<steps;i++){p=[p[0]+rnd(-dx,dx),p[1]+rnd(-dy*1.2,dy*.5)];out.push(p)}return out}
+/* kind: 'normal' | 'fault' | 'off'
+   Parâmetros visuais: tamanho cresce quando a fumaça vem para a face (rev) e diminui quando vai para o fundo (normal). */
+function emit(z,kind){
+ const P=PATHS[z], now=performance.now(), N=64, spread=2200;
+ applicator={z,until:now+spread+300};
+ for(let i=0;i<N;i++){
+  let spec, cfg;
+  if(kind==='off'){
+   spec={f:randomDrift(P.src.f,4,45,40),s:randomDrift(P.src.s,4,22,20)};cfg={dur:5200,r0:4,r1:22,rEnd:30,alpha:.55,jf:4,js:2,ease:t=>t};
+  } else if(kind==='fault'){
+   const F=P.fault;
+   if(F.kind==='vortex'&&Math.random()<.4){spec=F.escape;cfg={dur:5200,r0:3,r1:12,rEnd:24,alpha:.8,jf:4,js:2}}
+   else if(F.kind==='vortex'){spec=F;cfg={dur:4800,r0:3,r1:12,rEnd:14,alpha:.8,jf:3,js:1.5}}
+   else if(F.kind==='rev'){spec=F;cfg={dur:5200,r0:3,r1:12,rEnd:30,alpha:.78,jf:6,js:3}}
+   else if(F.kind==='stag'){spec=F;cfg={dur:7200,r0:3,r1:14,rEnd:20,alpha:.7,jf:8,js:4,ease:t=>t}}
+   else if(F.kind==='cross'){spec=Math.random()<.2?P.normal:F;cfg={dur:3800,r0:3,r1:14,rEnd:22,alpha:.75,jf:10,js:4}}
+  } else {
+   spec=(P.alt&&Math.random()<.4)?P.alt:P.normal;cfg={dur:3900,r0:3,r1:11,rEnd:3,alpha:.85,jf:5,js:2.5,capture:true};
+  }
+  parts.push({born:now+i*(spread/N),dur:cfg.dur*rnd(.9,1.1),f:catmull(jit(spec.f,cfg.jf)),s:catmull(jit(spec.s,cfg.js)),
+   r0:cfg.r0,r1:cfg.r1*rnd(.8,1.2),rEnd:cfg.rEnd,a:cfg.alpha*rnd(.8,1),ease:cfg.ease||(t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2),capture:!!cfg.capture,ph:rnd(0,6.28)});
+ }
+}
+// sprite de fumaça (disco suave)
+const sprite=document.createElement('canvas');sprite.width=sprite.height=64;
+(()=>{const c=sprite.getContext('2d'),g=c.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(250,253,255,1)');g.addColorStop(.35,'rgba(236,243,245,.85)');g.addColorStop(.7,'rgba(210,222,226,.35)');g.addColorStop(1,'rgba(200,215,220,0)');c.fillStyle=g;c.fillRect(0,0,64,64)})();
+function sample(path,u){const n=path.length-1,x=u*n,i=Math.min(n-1,Math.floor(x)),f=x-i;const a=path[i],b=path[i+1]||a;return[a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]}
+function partState(p,now){
+ const t=(now-p.born)/p.dur;if(t<0||t>1)return null;
+ const u=p.ease(t);
+ const r=u<.35?p.r0+(p.r1-p.r0)*(u/.35):p.r1+(p.rEnd-p.r1)*((u-.35)/.65);
+ let a=p.a*Math.min(1,t/.08);
+ const fadeStart=p.capture?.8:.6; if(t>fadeStart)a*=1-(t-fadeStart)/(1-fadeStart);
+ return{u,r:Math.max(1,r),a};
+}
+
+/* =================== Desenho =================== */
+function drawApplicator(ctx,pt,sc){
+ ctx.save();ctx.translate(pt[0],pt[1]);ctx.scale(sc,sc);
+ ctx.fillStyle='#3d5663';ctx.strokeStyle='#d1dde0';ctx.lineWidth=1;
+ ctx.beginPath();ctx.roundRect(-44,-8,28,16,4);ctx.fill();ctx.stroke();
+ ctx.fillStyle='#98aab0';ctx.fillRect(-17,-3,15,6);
+ ctx.fillStyle='#fff';ctx.shadowColor='#fff';ctx.shadowBlur=8;ctx.beginPath();ctx.arc(0,0,3,0,7);ctx.fill();
+ ctx.restore();
+}
+function drawFront(now){
+ const {s,ox,oy,dpr}=map;
+ fctx.setTransform(dpr,0,0,dpr,0,0);fctx.clearRect(0,0,fc.width,fc.height);
+ fctx.setTransform(dpr*s,0,0,dpr*s,dpr*ox,dpr*oy);
+ const vis=light?1:.28;
+ for(const p of parts){const st=partState(p,now);if(!st)continue;
+  const [x,y]=sample(p.f,st.u), w=Math.sin(now/400+p.ph)*1.5;
+  fctx.globalAlpha=st.a*vis;fctx.drawImage(sprite,x+w-st.r,y-st.r,st.r*2,st.r*2)}
+ fctx.globalAlpha=1;
+ if(applicator&&now<applicator.until)drawApplicator(fctx,PATHS[applicator.z].src.f,1);
+}
+function drawSide(now){
+ const c=sctx;c.setTransform(2,0,0,2,0,0);c.clearRect(0,0,300,220);
+ // piso e operador
+ c.fillStyle='#b9c6c8';c.fillRect(0,200,300,20);
+ c.fillStyle='#8aa0a8';c.globalAlpha=.5;c.beginPath();c.arc(12,70,9,0,7);c.fill();c.fillRect(4,80,16,90);c.globalAlpha=1;
+ c.fillStyle='#4d626a';c.font='bold 7px sans-serif';c.fillText('OPERADOR',2,58);
+ // corpo da capela
+ c.fillStyle='#e9eeee';c.strokeStyle='#52656b';c.lineWidth=1.5;
+ c.fillRect(60,8,200,192);c.strokeRect(60,8,200,192);
+ c.fillStyle='#aebbbd';c.fillRect(60,8,200,20); // cabeçote
+ c.fillStyle='#c4cfd1';c.fillRect(250,-2,12,10); // duto
+ c.fillStyle='#657982';c.fillRect(236,0,20,12);
+ // interior
+ c.fillStyle='#d6dfe1';c.fillRect(64,28,190,152);
+ // bancada
+ c.fillStyle='#75888e';c.fillRect(60,180,200,6);
+ // aerofólio
+ c.fillStyle='#9fb0b5';c.beginPath();c.ellipse(58,190,12,4,0,0,7);c.fill();
+ // defletor (placa com folgas em cima, no meio e embaixo) e plenum
+ c.fillStyle='#8b9ca1';c.fillRect(226,64,6,44);c.fillRect(226,116,6,52);
+ c.fillStyle='#c5d0d3';c.fillRect(232,28,22,152);
+ // janela
+ const sb=sashTest?112:180;
+ c.fillStyle='#9fd3e3';c.globalAlpha=.55;c.fillRect(58,20,5,sb-20);c.globalAlpha=1;c.fillStyle='#526b74';c.fillRect(56,sb-4,9,5);
+ // equipamento
+ c.fillStyle='#3a525d';c.fillRect(116,146,40,34);
+ // luz
+ c.fillStyle=light?'#fff3a0':'#9aa';c.fillRect(120,26,60,2);
+ // rótulos
+ c.fillStyle='#4d626a';c.font='bold 7px sans-serif';
+ c.fillText('FACE',48,6+4);c.fillText('DEFLETOR',196,60);c.fillText('DUTO',262,8);c.fillText('EQUIP.',118,142);c.fillText('JANELA',64,sb-8<30?40:sb-8);
+ if(!light){c.fillStyle='rgba(11,24,32,.45)';c.fillRect(64,28,190,152)}
+ // partículas
+ const vis=light?1:.35;
+ for(const p of parts){const st=partState(p,now);if(!st)continue;const [x,y]=sample(p.s,st.u),r=Math.max(1,st.r*.55);
+  c.globalAlpha=st.a*vis*.95;c.drawImage(sprite,x-r,y-r,r*2,r*2)}
+ c.globalAlpha=1;
+ if(applicator&&now<applicator.until)drawApplicator(c,PATHS[applicator.z].src.s,.5);
+ // setas de exaustão
+ if(exhaust){c.strokeStyle='#1d9cc4';c.lineWidth=1.2;c.setLineDash([3,3]);c.lineDashOffset=-(now/40)%6;c.beginPath();c.moveTo(243,170);c.lineTo(243,8);c.stroke();c.setLineDash([])}
+}
+function frame(now){
+ parts=parts.filter(p=>now-p.born<p.dur);
+ drawFront(now);drawSide(now);
+ requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* =================== Controles da capela =================== */
+function ready(){return exhaust&&light&&sashTest}
+function missing(){if(!exhaust)return'Primeiro ligue a exaustão da capela.';if(!light)return'Ligue a iluminação: sem ela a fumaça fica difícil de observar.';if(!sashTest)return'Coloque a janela na posição definida para o ensaio.';return'Clique em uma das regiões tracejadas para aplicar a fumaça.'}
+function updateControls(){
+ $('#sashG').style.transform=sashTest?'translateY(0)':'translateY(170px)';
+ $('#darkOverlay').setAttribute('opacity',light?0:.55);
+ $('#lightStrip').setAttribute('fill',light?'#fff6b8':'#d8e3e5');
+ $('#exhLed').setAttribute('fill',exhaust?'#35d08a':'#778');
+ $('#exhaustBtn').textContent='EXAUSTÃO • '+(exhaust?'ON':'OFF');$('#exhaustBtn').classList.toggle('on',exhaust);
+ $('#lightBtn').textContent='ILUMINAÇÃO • '+(light?'ON':'OFF');$('#lightBtn').classList.toggle('on',light);
+ $('#sashBtn').textContent='JANELA • '+(sashTest?'ENSAIO':'FECHADA');$('#sashBtn').classList.toggle('on',sashTest);
+ $('#hoodStatus').textContent=mode==='learn'?'Condição controlada pela demonstração.':ready()?'Capela preparada: aplique a fumaça nas regiões.':'Prepare a capela antes de aplicar a fumaça.';
+}
+function guardLearn(){if(mode==='learn'){toast('No APRENDER, a condição da capela é controlada pela demonstração.');return true}return false}
+$('#exhaustBtn').onclick=()=>{if(guardLearn())return;exhaust=!exhaust;updateControls();log('Exaustão '+(exhaust?'ligada':'desligada')+'.')};
+$('#lightBtn').onclick=()=>{if(guardLearn())return;light=!light;updateControls();log('Iluminação '+(light?'ligada':'desligada')+'.')};
+$('#sashBtn').onclick=()=>{if(guardLearn())return;sashTest=!sashTest;updateControls();log('Janela '+(sashTest?'na posição de ensaio':'fechada')+'.')};
+
+/* =================== APRENDER =================== */
+function renderDemo(){
+ const d=REGIONS[demoIndex];
+ $('#demoCount').textContent=`DEMONSTRAÇÃO ${demoIndex+1} DE ${REGIONS.length}`;$('#demoTitle').textContent=d.t;
+ $('#demoWhat').textContent=d.w;$('#demoObserve').textContent=d.o;$('#demoWhy').textContent=d.y;
+ $('#demoAnom').style.display='none';
+ $('#anomBtn').style.display=PATHS[d.z].fault?'inline-block':'none';
+ $('#progress').innerHTML=REGIONS.map((_,i)=>`<i class="dot ${i<=demoIndex?'done':''}"></i>`).join('');
+ $('#next').textContent=demoIndex===REGIONS.length-1?'Concluir APRENDER':'Próxima';
+ parts=[];setTimeout(()=>emit(d.z,'normal'),250);
+}
+$('#replay').onclick=()=>{$('#demoAnom').style.display='none';parts=[];emit(REGIONS[demoIndex].z,'normal')};
+$('#anomBtn').onclick=()=>{const z=REGIONS[demoIndex].z;$('#demoAnomText').textContent=FAULTS[z].txt;$('#demoAnom').style.display='block';parts=[];emit(z,'fault');log('Exemplo de anomalia exibido: '+R(z).name+'.')};
+$('#next').onclick=()=>{
+ if(demoIndex<REGIONS.length-1){demoIndex++;renderDemo();return}
+ learned=true;unlock('practice');toast('APRENDER concluído. PRATICAR liberado.');log('Demonstração guiada concluída.');setMode('practice');
+};
+
+/* =================== PRATICAR / AVALIAÇÃO =================== */
+function unlock(m){const b=$(`.mode[data-mode="${m}"]`);b.classList.remove('lock');b.textContent=m==='practice'?'PRATICAR':'AVALIAÇÃO';b.title=''}
+function expected(z){return z===fault?FAULTS[z].cat:'captura'}
+function renderObs(){
+ $('#obsList').innerHTML='';
+ REGIONS.forEach(r=>{
+  const row=document.createElement('div');row.className='obsRow';
+  const seen=observed.has(r.z);
+  row.innerHTML=`<div class="obsHead">${r.name}<i class="${seen?'ok':''}">${seen?'fumaça aplicada':'pendente'}</i></div>`;
+  const sel=document.createElement('select');sel.disabled=!seen;sel.setAttribute('aria-label','Classificação: '+r.name);
+  sel.innerHTML=CATS.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');sel.value=answers[r.z]||'';
+  const fb=document.createElement('div');fb.className='fb';
+  sel.onchange=()=>{answers[r.z]=sel.value;log('Classificação registrada — '+r.name+': '+(CATNAME[sel.value]||'—')+'.');showFb(r.z,fb);checkDone()};
+  row.append(sel,fb);$('#obsList').appendChild(row);showFb(r.z,fb);
+ });
+}
+function showFb(z,fb){
+ fb.textContent='';fb.className='fb';
+ if(mode!=='practice'||!answers[z])return;
+ if(answers[z]===expected(z)){fb.textContent='✓ Correto.';fb.classList.add('ok')}
+ else{fb.textContent='✗ Reveja: '+(z===fault?FAULTS[z].txt:'aqui a fumaça foi conduzida de forma contínua até o defletor, sem retorno nem estagnação.')+' Aplique a fumaça novamente e compare com a vista lateral.';fb.classList.add('bad')}
+}
+function allClassified(){return REGIONS.every(r=>observed.has(r.z)&&answers[r.z])}
+function checkDone(){
+ const done=allClassified();$('#reportBtn').disabled=!done;
+ if(done&&mode==='practice'&&!practiced&&REGIONS.every(r=>answers[r.z]===expected(r.z))){practiced=true;unlock('eval');toast('Prática concluída. AVALIAÇÃO liberada.');log('Prática concluída.')}
+ else if(done&&mode==='practice'&&!practiced)toast('Todas as regiões foram classificadas, mas há respostas a revisar. A AVALIAÇÃO é liberada quando todas estiverem corretas.');
+}
+function applySmoke(z){
+ if(mode==='learn')return;
+ if(!exhaust&&light&&sashTest){ // permite visualizar o efeito, mas registra a falha de preparação
+  errors++;log('Fumaça aplicada com a exaustão desligada — '+R(z).name+'.');toast('Exaustão desligada: a fumaça se espalha pela sala. Ligue a exaustão antes do ensaio.');parts=[];emit(z,'off');return}
+ if(!ready()){errors++;toast(missing());log('Tentativa de aplicar fumaça sem preparação completa.');return}
+ parts=[];
+ const isFault=(z===fault);
+ emit(z,isFault?'fault':'normal');
+ observed.add(z);$(`.zone[data-zone="${z}"]`).classList.add('seen');
+ log('Fumaça aplicada: '+R(z).name+'.');
+ renderObs();checkDone();
+}
+$('#helpBtn').onclick=()=>{
+ if(!ready())return toast(missing());
+ const next=REGIONS.find(r=>!observed.has(r.z));if(next)return toast('Falta aplicar a fumaça em: '+next.name+'.');
+ const nc=REGIONS.find(r=>!answers[r.z]);if(nc)return toast('Classifique o comportamento observado em: '+nc.name+'.');
+ toast('Tudo registrado. Gere o relatório.');
+};
+
+/* =================== Troca de modo =================== */
+function setMode(m){
+ if(m==='practice'&&!learned){toast('Conclua o APRENDER primeiro.');return}
+ if(m==='eval'&&!practiced){toast('Conclua o PRATICAR primeiro.');return}
+ mode=m;parts=[];applicator=null;observed.clear();for(const k in answers)delete answers[k];errors=0;
+ $$('.mode').forEach(x=>x.classList.toggle('on',x.dataset.mode===m));
+ $$('.zone').forEach(z=>z.classList.remove('seen'));
+ $('#lab').classList.toggle('interactive',m!=='learn');
+ $('#demoCard').style.display=m==='learn'?'block':'none';
+ $('#obsCard').style.display=m==='learn'?'none':'block';
+ $('#helpBtn').style.display=m==='practice'?'block':'none';
+ $('#reportBtn').style.display=m==='learn'?'none':'block';$('#reportBtn').disabled=true;
+ if(m==='learn'){
+  exhaust=light=sashTest=true;fault=null;demoIndex=0;
+  $('#sideTitle').textContent='APRENDER • Demonstração guiada';$('#sideText').textContent='Observe cada região antes de executar o ensaio por conta própria. Use "Ver anomalia" para comparar com um comportamento inadequado.';
+  updateControls();renderDemo();
+ } else {
+  exhaust=light=sashTest=false;
+  const keys=Object.keys(FAULTS);fault=keys[Math.floor(Math.random()*keys.length)];
+  $('#sideTitle').textContent=m==='practice'?'PRATICAR • Agora é com você':'AVALIAÇÃO • Execute e interprete';
+  $('#sideText').textContent=m==='practice'?'Prepare a capela, aplique a fumaça nas seis regiões e classifique cada comportamento. Nesta rodada há uma condição anômala escondida; você recebe retorno a cada classificação.':'Sem dicas durante o procedimento. Há uma condição anômala nesta capela. Aplique a fumaça, classifique cada região e gere o relatório.';
+  $('#obsIntro').textContent=m==='practice'?'Depois de aplicar a fumaça, escolha a classificação. O sistema indica se está correta.':'As classificações só serão corrigidas no relatório.';
+  updateControls();renderObs();log('Modo '+(m==='practice'?'PRATICAR':'AVALIAÇÃO')+' iniciado.');
+ }
+}
+$$('.mode').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+
+/* =================== Relatório =================== */
+$('#reportBtn').onclick=()=>{
+ if(!allClassified())return;
+ const ev=mode==='eval';
+ $('#rMode').textContent=ev?'Modo Avaliação':'Modo Praticar';
+ $('#rDate').textContent=new Date().toLocaleDateString('pt-BR');
+ let hits=0;
+ $('#rBody').innerHTML=REGIONS.map(r=>{const ok=answers[r.z]===expected(r.z);if(ok)hits++;
+  return `<tr><td>${r.name}</td><td>${CATNAME[answers[r.z]]}</td><td>${CATNAME[expected(r.z)]} <span class="${ok?'okc':'badc'}">${ok?'✓':'✗'}</span></td></tr>`}).join('');
+ $('#rScore').innerHTML=`<div class="score"><b>Resultado: ${hits} de ${REGIONS.length} regiões classificadas corretamente.</b><br>Condição anômala simulada nesta rodada: <b>${R(fault).name}</b> — ${FAULTS[fault].txt}<br><i>Causa provável:</i> ${FAULTS[fault].cause}</div>`;
+ $('#rErrors').innerHTML=`<div class="rbox" style="margin-top:10px"><b>Registro de procedimento:</b> ${errors?errors+' tentativa(s) de aplicar fumaça sem a capela preparada.':'nenhuma tentativa fora da sequência foi registrada.'}</div>`;
+ $('#report').classList.add('open');log('Relatório gerado ('+hits+'/'+REGIONS.length+').');
+};
+$('#closeReport').onclick=()=>$('#report').classList.remove('open');
+$('#printBtn').onclick=()=>window.print();
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#report').classList.remove('open')});
+
+/* =================== Início =================== */
+layout();setMode('learn');
+})();
+</script></body></html>
